@@ -31,7 +31,7 @@ st.set_page_config(
 
 def initialize_session_state() -> None:
     """Initialize session state with default values if not already present."""
-    if "init" not in st.session_state:
+    if "data_init" not in st.session_state:
         st.session_state.chart_data = pd.DataFrame(
             np.random.randn(20, 3), 
             columns=["a", "b", "c"]
@@ -40,7 +40,7 @@ def initialize_session_state() -> None:
             np.random.randn(1000, 2) / [50, 50] + [37.76, -122.4],
             columns=["lat", "lon"]
         )
-        st.session_state.init = True
+        st.session_state.data_init = True
 
 # Define application pages
 pages = [
@@ -61,6 +61,7 @@ def render_sidebar_header(auth_user: str, authorizer: AuthHub, page: StreamlitPa
         st.markdown(f"👋 Welcome, **{auth_user}**")
         if st.button("Logout", type="secondary"):
             authorizer.logout()
+            st.session_state.pop("init", None)
         st.divider()
 
 def render_sidebar_content(page: StreamlitPage) -> None:
@@ -91,10 +92,11 @@ def render_sidebar_content(page: StreamlitPage) -> None:
 
 def dashboard(authorizer: AuthHub) -> None:
     """Main dashboard rendering function."""
-    initialize_session_state()
     
     if "auth_user" not in st.session_state:
         return
+    
+    initialize_session_state()
 
     page = st.navigation(pages)
     page.run()

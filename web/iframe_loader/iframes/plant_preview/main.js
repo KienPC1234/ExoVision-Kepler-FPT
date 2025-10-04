@@ -13,6 +13,15 @@ const capWarning = document.getElementById('capWarning');
 function showError(msg) { capWarning.style.display = 'block'; capWarning.textContent = msg; }
 function hideError() { capWarning.style.display = 'none'; capWarning.textContent = ''; }
 
+let isRealistic = false;
+const REAL_AU_UNITS = 100;
+const REAL_R_SUN_AU = 0.00465;
+const REAL_R_J_AU = 0.000467;
+const REAL_PLANET_MAG = 100;
+const REAL_STAR_MAG = 100;
+let currentOrbitalScale = 5;
+let currentOrbitalRadius = 5;
+
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 function tempToHSL(eqTemp) {
   const t = clamp((eqTemp - 50) / (2000 - 50), 0, 1);
@@ -70,14 +79,16 @@ function calculateProxies(params) {
       const density_rel = mass_earth / Math.pow(rad_earth, 3);
       params.mass = mass_earth;
       params.density = density_rel * 5.514;
+      params.density_proxy = 1 / Math.pow(rad_j, 3);
     } else {
       params.mass = 0;
       params.density = 0;
+      params.density_proxy = 0;
     }
   }
   if ('pl_orbper' in params && 'st_teff' in params && 'pl_insol' in params) {
     const per = params.pl_orbper || 0, teff = params.st_teff || 0, insol = params.pl_insol || 1;
-    params.habitability_proxy = (per * 0.5) / (teff + 1e-12) * Math.sqrt(insol);
+    params.habitability_proxy = (per * 0.7) / (teff + 1e-12);
   }
   if ('depth' in params && 'pl_trandur' in params) {
     const dep = params.depth || 0, dur = params.pl_trandur || 0;
@@ -168,7 +179,7 @@ rim.castShadow = false;
 scene.add(rim);
 
 // grid
-const grid = new THREE.GridHelper(40, 40, 0x12313a, 0x091217);
+let grid = new THREE.GridHelper(40, 40, 0x12313a, 0x091217);
 grid.position.y = -3.5; grid.material.opacity = 0.06; grid.material.transparent = true;
 scene.add(grid);
 
@@ -302,7 +313,12 @@ function buildPlanet(params) {
 
   const insol = params.pl_insol || 1, rStar = params.st_rad || 1, tStar = params.st_teff || 5778, tSun = 5772;
   const aAU = Math.sqrt(rStar * rStar * Math.pow(tStar / tSun, 4) / insol);
-  const orbitalRadius = clamp(aAU * 5, 2, 50);
+  let orbitalRadius;
+  if (isRealistic) {
+    orbitalRadius = clamp(aAU * REAL_AU_UNITS, 1, 200);
+  } else {
+    orbitalRadius = clamp(aAU * currentOrbitalScale, 2, 50);
+  }
 
   // orbit ring
   const orbitGeo = new THREE.RingGeometry(orbitalRadius - 0.05, orbitalRadius + 0.05, 128);
@@ -313,7 +329,12 @@ function buildPlanet(params) {
   planetGroup.add(orbit);
   orbit.rotation.z = (1 - (params.koi_impact || 0)) * Math.PI / 2;
 
-  const visualRadius = clamp((params.pl_radj || 1) * 0.45, 0.2, 3.0);
+  let visualRadius;
+  if (isRealistic) {
+    visualRadius = clamp((params.pl_radj || 1) * REAL_R_J_AU * REAL_AU_UNITS * REAL_PLANET_MAG, 0.01, 5);
+  } else {
+    visualRadius = clamp((params.pl_radj || 1) * 0.45, 0.2, 3.0);
+  }
   const color = hslToThreeColor(tempToHSL(params.pl_eqt || 300));
 
   // choose texture
@@ -342,15 +363,17 @@ function buildPlanet(params) {
     <p>Classification: ${classification}</p>
     <p>Radius: ${params.pl_radj || 'N/A'} R_J</p>
     <p>Eq Temp: ${params.pl_eqt || 'N/A'} K</p>
-    <p>Insolation: ${params.pl_insol || 'N/A'} Earth flux</p>
+    <p>Insolation: ${params.pl_insol || 'N/A'} F_Earth</p>
     <p>Mass: ${params.mass?.toFixed(2) || 'N/A'} M⊕</p>
     <p>Density: ${params.density?.toFixed(2) || 'N/A'} g/cm³</p>
+    <p>Density Proxy: ${params.density_proxy?.toFixed(2) || 'N/A'}</p>
     <p>Habitability Proxy: ${params.habitability_proxy?.toFixed(2) || 'N/A'}</p>
     <p>Orbital Period: ${params.pl_orbper || 'N/A'} days</p>
     <p>Transit Duration: ${params.pl_trandur || 'N/A'} hours</p>
-    <p>Depth: ${params.depth || 'N/A'} ppm</p>
+    <p>Depth: ${params.depth || 'N/A'} (fraction)</p>
     <p>Impact Parameter: ${params.koi_impact || 'N/A'}</p>
-    <p>Disposition: ${params.disposition || 'N/A'}</p>`;
+    <p>Disposition: ${params.disposition || 'N/A'}</p>
+    <p>Transit Shape Proxy: ${params.transit_shape_proxy?.toFixed(2) || 'N/A'}</p>`;
   planet.userData.orbitalRadius = orbitalRadius;
   planet.renderOrder = 1; // draw planet after connector (helps visibility)
 
@@ -483,6 +506,7 @@ function buildPlanet(params) {
   // store some helper refs
   const result = { planet, clouds, atmosphere, rings, orbit, axisGroup, tiltGroup, spinGroup, connectorMesh, coneStart, coneEnd, textSprite };
   result.currentDistanceAU = aAU;
+  result.orbitalRadius = orbitalRadius;
   return result;
 }
 
@@ -493,19 +517,20 @@ const unitsMap = {
   pl_radj: 'R_J',
   koi_impact: '',
   pl_trandur: 'hours',
-  depth: 'ppm',
+  depth: '',
   pl_orbper: 'days',
   st_teff: 'K',
-  st_logg: 'log(cm/s²)',
+  st_logg: 'dex',
   st_rad: 'R_Sun',
-  pl_insol: 'Earth flux',
+  pl_insol: 'F_Earth',
   pl_eqt: 'K',
   st_dist: 'pc',
   disposition: '',
-  habitability_proxy: '',
-  transit_shape_proxy: '',
+  habitability_proxy: 'days/K',
+  transit_shape_proxy: 'fraction/hr',
   mass: 'M⊕',
-  density: 'g/cm³'
+  density: 'g/cm³',
+  density_proxy: ''
 };
 
 // --- Thay thế populateTable (bảng có nhãn dễ đọc + header vertical) ---
@@ -514,12 +539,12 @@ const friendlyLabels = {
   pl_radj: 'Planet radius (R_J)',
   koi_impact: 'Impact parameter',
   pl_trandur: 'Transit duration (hours)',
-  depth: 'Depth (ppm)',
+  depth: 'Depth (fraction)',
   pl_orbper: 'Orbital period (days)',
   st_teff: 'Stellar Teff (K)',
   st_logg: 'Stellar logg',
   st_rad: 'Stellar radius (R_Sun)',
-  pl_insol: 'Insolation (Earth flux)',
+  pl_insol: 'Insolation (F_Earth)',
   pl_eqt: 'Equilibrium temp (K)',
   st_dist: 'Distance (pc)',
   disposition: 'Disposition',
@@ -527,6 +552,7 @@ const friendlyLabels = {
   transit_shape_proxy: 'Transit shape',
   mass: 'Mass (M⊕)',
   density: 'Density (g/cm³)',
+  density_proxy: 'Density proxy',
   axial_tilt: 'Axial tilt (°)'
 };
 
@@ -592,6 +618,21 @@ const speedSlider = document.getElementById('speedSlider');
 const speedValue = document.getElementById('speedValue');
 speedSlider.addEventListener('input', () => { speedValue.textContent = speedSlider.value; });
 
+// Realistic toggle
+let realisticToggle = document.getElementById('realisticToggle');
+if (!realisticToggle) {
+  const realisticDiv = document.createElement('div');
+  realisticDiv.style.marginTop = '10px';
+  realisticDiv.innerHTML = '<label for="realisticToggle" style="color: #fff; font-size: 14px;"><input type="checkbox" id="realisticToggle"> Realistic Scale</label>';
+  const parentControl = speedSlider.parentNode;
+  parentControl.appendChild(realisticDiv);
+  realisticToggle = document.getElementById('realisticToggle');
+}
+realisticToggle.addEventListener('change', () => {
+  isRealistic = realisticToggle.checked;
+  if (currentParams) updateFromParams(currentParams);
+});
+
 let currentParams = null;
 let visObjects = null;
 
@@ -604,10 +645,17 @@ function updateFromParams(params) {
   currentParams = params;
   populateTable(params);
 
+  let orbitalScale = 5;
+  let starScaleVal = (params.st_rad || 1) * 3;
+  if (isRealistic) {
+    orbitalScale = REAL_AU_UNITS;
+    starScaleVal = (params.st_rad || 1) * REAL_R_SUN_AU * REAL_AU_UNITS * REAL_STAR_MAG;
+  }
+  currentOrbitalScale = orbitalScale;
+
   // star scale & glow
-  const starScale = (params.st_rad || 1) * 3;
-  starSphere.scale.setScalar(starScale);
-  starGlow.scale.setScalar(3 * starScale);
+  starSphere.scale.setScalar(starScaleVal);
+  starGlow.scale.setScalar(3 * starScaleVal);
 
   // star light intensity/color tweaks
   const magIntensity = clamp(2 - (params.koi_kepmag || 12.5) / 10, 0.5, 5);
@@ -623,12 +671,30 @@ function updateFromParams(params) {
   starSphere.userData.info = `<h3>Host Star</h3>
     <p>Radius: ${params.st_rad || 'N/A'} R_Sun</p>
     <p>Teff: ${params.st_teff || 'N/A'} K</p>
-    <p>Logg: ${params.st_logg || 'N/A'} log(cm/s²)</p>
+    <p>Logg: ${params.st_logg || 'N/A'} dex</p>
     <p>Kepmag: ${params.koi_kepmag || 'N/A'} mag</p>
     <p>Distance: ${params.st_dist || 'N/A'} pc</p>`;
   starGlow.userData.info = starSphere.userData.info;
 
   visObjects = buildPlanet(params);
+  if (visObjects) {
+    currentOrbitalRadius = visObjects.orbitalRadius;
+
+    // update grid
+    scene.remove(grid);
+    const gridSize = Math.max(40, currentOrbitalRadius * 2);
+    const gridDivisions = Math.max(20, Math.round(gridSize / 2));
+    grid = new THREE.GridHelper(gridSize, gridDivisions, 0x12313a, 0x091217);
+    grid.position.y = -Math.max(3.5, starScaleVal * 0.5);
+    grid.material.opacity = 0.06;
+    grid.material.transparent = true;
+    scene.add(grid);
+
+    // update camera position
+    camera.position.set(currentOrbitalRadius * 1.2, currentOrbitalRadius * 0.8, currentOrbitalRadius * 1.5);
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }
 }
 
 btnUpdate.addEventListener('click', () => { const parsed = safeParseJSON(jsonInput.value); if (parsed) updateFromParams(parsed); });
@@ -696,7 +762,7 @@ function animate(t) {
       visObjects.textSprite.lookAt(camera.position);
 
       // cập nhật stored distance
-      const distAU = (planetPos.length() / 5); // xấp xỉ
+      const distAU = planetPos.length() / currentOrbitalScale;
       visObjects.currentDistanceAU = distAU;
       connector.userData.info = `<h3>Distance</h3><p>${distAU.toFixed(2)} AU</p>`;
 

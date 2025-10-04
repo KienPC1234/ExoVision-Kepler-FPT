@@ -16,3 +16,4 @@ psycopg2
 tsai[extras]
 passlib
 argon2_cffi
+tsai
