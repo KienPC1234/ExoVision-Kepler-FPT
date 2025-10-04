@@ -1,4 +1,4 @@
-import datetime
+import datetime, time
 from typing import Union, Optional, Literal
 
 import streamlit as st
@@ -14,7 +14,7 @@ def redirect(page_name: str):
     st.query_params["page"] = page_name
     st.rerun()
 
-def delete_client_cooke(cookie_name):
+def delete_client_cookie(cookie_name):
     """
     Inject small JS snippet that:
       - attempts to delete the cookie for several domain variants
@@ -63,28 +63,53 @@ class CookieUtil:
         self.manager = stx.CookieManager()
         self._set = self.manager.set
         self._delete = self.manager.delete
-        self.get = self.manager.get
+
+        # Populate cookies early — some environments populate asynchronously.
+        try:
+            self.manager.get_all()
+            time.sleep(0.05)
+        except Exception:
+            pass
+
+    def get(self, cookie: str):
+        """
+        Safe get: if the component hasn't populated cookies yet it may have
+        'cookies' set to a boolean flag. We try to initialize/populate and
+        fall back to None if we can't get a value.
+        """
+        # fast path: if manager has a dict-like cookies attribute
+        cookies = getattr(self.manager, "cookies", None)
+        if isinstance(cookies, dict):
+            return cookies.get(cookie)
+
+        # last attempt: force get_all(), wait briefly, then inspect cookies again
+        try:
+            self.manager.get_all()
+            time.sleep(0.05)
+            if isinstance(self.manager.cookies, dict):
+                return self.manager.get(cookie)
+        except Exception:
+            pass
+
+        return None
 
     def set(
-            self,
-            cookie: str,
-            val: Union[str, int, float, bool],
-            path: str = "/",
-            max_age: Optional[float] = None,
-            secure: Optional[bool] = False,
-            same_site: Union[bool, None, Literal["lax", "strict"]] = "lax",
-            **kwargs
+          self,
+          cookie: str,
+          val: Union[str, int, float, bool],
+          path: str = "/",
+          max_age: Optional[float] = None,
+          secure: Optional[bool] = False,
+          same_site: Union[bool, None, Literal["lax", "strict"]] = "lax",
+          **kwargs
         ):
-        """
-        Set cookie with options. Use the same options for set/delete to avoid mismatches.
-        For local dev use secure=False. In production (HTTPS) set secure=True.
-        """
+        # delegate to bound manager.set
         self._set(
             cookie,
             val=val,
             max_age=max_age,
             path=path,
-            secure=secure,   # DEV: switch to True when serving over HTTPS
+            secure=secure,
             same_site=same_site,
             **kwargs
         )

@@ -12,6 +12,7 @@ def main(authorizer: AuthHub):
 
     if submitted:
         if authorizer.login(username, password):
+            authorizer.wait_for_cookie(0.2)
             st.rerun()
         else:
             st.error("❌ Invalid username or password")

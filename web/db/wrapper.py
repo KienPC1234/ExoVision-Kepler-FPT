@@ -184,11 +184,11 @@ class AsyncDBWrapper:
             filters.append(User.id != exclude_user_id)
         return (await self.query_model(User, filters=filters)) is not None
 
-    async def soft_delete_user(self, user):
+    async def soft_delete_user(self, user: User):
         await user.soft_delete()
         await self.save_user(user)
 
-    async def restore_user(self, user):
+    async def restore_user(self, user: User):
         await user.soft_restore()
         await self.save_user(user)
 

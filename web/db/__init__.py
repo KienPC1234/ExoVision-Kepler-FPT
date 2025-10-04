@@ -1,4 +1,4 @@
-from .base import Base, engine, SessionLocal, isAsyncEngine, initiate
+from .base import Base, initiate
 from .wrapper import AsyncDBWrapper, DBWrapper
 
 USE_ASYNC_DB = False
@@ -7,6 +7,8 @@ USE_ASYNC_DB = False
 # 1️⃣ Khởi tạo engine trước
 # ------------------------
 initiate(USE_ASYNC_DB)
+
+from .base import engine, SessionLocal, isAsyncEngine
 
 # ------------------------
 # 2️⃣ Tạo bảng sau khi engine đã sẵn sàng
