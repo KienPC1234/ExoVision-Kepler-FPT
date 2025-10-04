@@ -1,0 +1,17 @@
+sktime
+numba
+lightkurve
+flask
+pyarrow
+fastparquet
+torch
+tensorflow[and-cuda]
+itsdangerous
+streamlit
+extra-streamlit-components
+sqlalchemy
+websockets
+asyncpg
+psycopg2
+tsai[extras]
+passlib

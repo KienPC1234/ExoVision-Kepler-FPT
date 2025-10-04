@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <style>
+    iframe {
+      width: 100%;
+      height: 600px; /* bạn chỉnh tùy ý */
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    textarea {
+      width: 100%;
+      height: 200px;
+      margin: 10px 0;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <h1>Hello!</h1>
+  <button onclick="changeIframeTheme('dark')">Change to Dark Theme</button>
+  <button onclick="changeIframeTheme('light')">Change to Light Theme</button>
+  <button onclick="triggerIframeActions()">Trigger Update/Reset and Hide Controls</button>
+
+  <h2>Update JSON Data</h2>
+  <textarea id="jsonInput">{
+  "koi_kepmag": 10.0,
+  "pl_radj": 2.0,
+  "koi_impact": 0.8,
+  "pl_trandur": 15.0,
+  "depth": 0.02,
+  "pl_orbper": 200.0,
+  "st_teff": 6000,
+  "st_logg": 4.5,
+  "st_rad": 1.2,
+  "pl_insol": 0.5,
+  "pl_eqt": 300,
+  "st_dist": 50,
+  "disposition": 1
+}</textarea>
+  <button onclick="updateIframeJson()">Update Iframe JSON</button>
+
+  <iframe id="planetIframe" src="http://103.252.0.76/iframe/plant_preview/" frameborder="0"></iframe>
+
+  <script>
+    function changeIframeTheme(mode) {
+      const iframe = document.getElementById('planetIframe');
+      if (iframe && iframe.contentWindow && iframe.contentWindow.changeTheme) {
+        iframe.contentWindow.changeTheme(mode);
+      } else {
+        console.error('Iframe not loaded or function not available');
+      }
+    }
+
+    function triggerIframeActions() {
+      const iframe = document.getElementById('planetIframe');
+      if (iframe && iframe.contentWindow && iframe.contentWindow.triggerAndHideControls) {
+        iframe.contentWindow.triggerAndHideControls();
+      } else {
+        console.error('Iframe not loaded or function not available');
+      }
+    }
+
+    function updateIframeJson() {
+      const textarea = document.getElementById('jsonInput');
+      let newJson;
+      try {
+        newJson = JSON.parse(textarea.value);
+      } catch (e) {
+        console.error('Invalid JSON:', e);
+        alert('Invalid JSON format!');
+        return;
+      }
+      const iframe = document.getElementById('planetIframe');
+      if (iframe && iframe.contentWindow && iframe.contentWindow.updateJsonData) {
+        iframe.contentWindow.updateJsonData(newJson);
+      } else {
+        console.error('Iframe not loaded or function not available');
+      }
+    }
+
+    // Optional: Auto-call on load
+    document.getElementById('planetIframe').onload = function() {
+      // Uncomment to auto-trigger on load
+      // changeIframeTheme('dark');
+      // triggerIframeActions();
+    };
+  </script>
+</body>
+</html>

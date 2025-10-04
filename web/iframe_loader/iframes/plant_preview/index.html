@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <base href="/iframe/plant_preview/">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>3D Planet Renderer</title>
+  <style>
+    :root {
+      --bg: #fff;
+      --text: #000;
+      --side-bg: #fff;
+      --border: #eee;
+      --shadow: rgba(0,0,0,.15);
+      --shadow-light: rgba(0,0,0,.06);
+      --light-bg: #fafafa;
+      --button-bg: #f7f7f7;
+      --button-border: #ddd;
+      --hint: #666;
+    }
+    .dark {
+      --bg: #000;
+      --text: #fff;
+      --side-bg: #121212;
+      --border: #333;
+      --shadow: rgba(0,0,0,.8);
+      --shadow-light: rgba(255,255,255,.1);
+      --light-bg: #1e1e1e;
+      --button-bg: #333;
+      --button-border: #555;
+      --hint: #aaa;
+    }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);color:var(--text)}
+    .wrap{display:flex;gap:12px;height:100vh;padding:12px;box-sizing:border-box}
+    .canvas-box{flex:1;min-width:300px;border-radius:10px;overflow:hidden;box-shadow:0 6px 18px var(--shadow)}
+    canvas{display:block;width:100%;height:100%}
+    .side{width:360px;max-width:40%;background:var(--side-bg);border-radius:10px;padding:12px;box-shadow:0 6px 18px var(--shadow-light);overflow:auto}
+    h2{margin:4px 0 10px;font-size:16px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    table td,table th{padding:6px 8px;border-bottom:1px solid var(--border)}
+    table th{text-align:left;font-weight:600;background:var(--light-bg)}
+    textarea{width:100%;height:140px;font-family:monospace;margin-top:8px}
+    .controls{display:flex;gap:8px;margin-top:8px}
+    button{padding:8px 10px;border-radius:6px;border:1px solid var(--button-border);background:var(--button-bg);cursor:pointer}
+    .hint{font-size:12px;color:var(--hint);margin-top:8px}
+    .error{color:#b00;background:#fee;padding:8px;border-radius:6px;margin-top:8px}
+    .dark .error {color:#f99;background:#300}
+    .speed-control{margin-top:12px;padding:8px;border:1px solid var(--border);border-radius:6px}
+    .speed-control label{display:block;margin-bottom:4px;font-size:14px}
+    .speed-control input[type="range"]{width:100%}
+    .tooltip{position:absolute;background:var(--side-bg);border:1px solid var(--border);padding:8px;border-radius:4px;box-shadow:0 2px 8px var(--shadow);display:none;z-index:10;max-width:300px;pointer-events:none;color:var(--text)}
+    .tooltip h3{margin:0 0 4px;font-size:14px}
+    .tooltip p{margin:2px 0;font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="canvas-box" id="sceneContainer"></div>
+    <div class="side">
+      <textarea id="jsonInput" style="display:none;">{
+  "koi_kepmag": 12.5,
+  "pl_radj": 1.0,
+  "koi_impact": 0.5,
+  "pl_trandur": 10.5,
+  "depth": 0.01,
+  "pl_orbper": 365.25,
+  "st_teff": 5778,
+  "st_logg": 4.44,
+  "st_rad": 1.0,
+  "pl_insol": 1.0,
+  "pl_eqt": 288,
+  "st_dist": 100,
+  "disposition": 1
+}</textarea>
+
+      <div class="controls">
+        <button onclick="document.documentElement.requestFullscreen()">🔍 Fullscreen</button>
+        <button id="btnUpdate">Reset</button>
+        <button  style="visibility: hidden;" id="btnReset"></button>
+      </div>
+
+      <div class="speed-control">
+        <label for="speedSlider">Orbital Speed Multiplier (1 day = 1s at 1x):</label>
+        <input type="range" id="speedSlider" min="0.1" max="100" step="0.1" value="1">
+        <span id="speedValue">1</span>x
+      </div>
+
+      <h2 style="margin-top:12px">Derived / Display information</h2>
+      <table id="infoTable">
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <div style="height:18px"></div>
+      <div class="hint">
+        <strong>⚠️ Note:</strong> This is only a visual approximation to help with imagination. 
+        Some values are simplified or exaggerated for visibility, and may differ from real physics.<br><br>
+            
+        Details: <br>
+        - <em>pl_radj</em> scales planet size.<br>
+        - <em>disposition</em>: 1 = show planet, 0 = hide planet & orbit.<br>
+        - <em>koi_kepmag</em> dims star brightness.<br>
+        - <em>pl_orbper</em> sets orbit period (days = seconds).<br>
+        - Orbit radius is estimated using Kepler’s law approximation from 
+          pl_insol, st_rad, st_teff (a ≈ sqrt(R² × (T/5772)^4 / insol)).<br>
+        - Star size is scaled up for visibility, based on st_rad.<br>
+        - Hover over objects to see tooltip information.
+      </div>
+
+      <div id="capWarning" class="error" style="display:none"></div>
+    </div>
+  </div>
+  <div id="tooltip" class="tooltip"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "/libs/three.js/build/three.module.js",
+      "three/addons/": "/libs/three.js/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="main.js"></script>
+  <script>
+    window.changeTheme = function(mode) {
+      document.documentElement.classList.toggle('dark', mode === 'dark');
+    };
+
+    window.updateJsonData = function(newJson) {
+      const textarea = document.getElementById('jsonInput');
+      if (textarea) {
+        textarea.value = JSON.stringify(newJson, null, 2);
+      }
+      const updateBtn = document.getElementById('btnUpdate');
+      if (updateBtn) {
+        updateBtn.click();
+      }
+    };
+  </script>
+</body>
+</html>
