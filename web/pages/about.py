@@ -1,30 +1,34 @@
 import streamlit as st
 
-@st.dialog("This is a dialog")
-def dialog_function():
-    st.write("This is a dialog function.")
-    if st.button("Close"):
-        st.rerun(scope="app")
+st.set_page_config(page_title="About Kepler FPT", page_icon="🌌")
 
-st.header("Layout elements")
+st.title("🌌 About Kepler FPT")
 
-a, b, c, d = st.tabs(["Tab A", "Tab B", "Tab C", "Tab D"])
-with a:
-    st.write("This is the content of Tab A.")
-with b:
-    st.write("This is the content of Tab B.")
-with c:
-    st.write("This is the content of Tab C.")
-with d:
-    st.write("This is the content of Tab D.")
+st.markdown("""
+We are **Kepler FPT** — a passionate team of Vietnamese developers who love **coding, exploring, and discovering new worlds** beyond our own 🌍🚀  
 
-st.subheader("Columns")
-col0, col1, col2 = st.columns(3, border=True)
-col0.write("This is the first column.")
-col1.write("This is the second column.")
-col2.write("This is the third column.")
-st.expander("Expander").write("This is an expander")
-col0, col1 = st.columns(2)
-col0.popover("Popover").write("This is a popover")
-if col1.button("Dialog"):
-    dialog_function()
+Born from **NASA’s Space Apps Challenge 2025**, our mission is to harness the power of **Artificial Intelligence (AI)** and **Machine Learning (ML)** to uncover **new exoplanets** hidden in data from NASA missions like **Kepler**, **K2**, and **TESS**.  
+
+With curiosity as our compass and innovation as our rocket fuel, we’re turning raw data into cosmic insights ✨  
+""")
+
+st.divider()
+
+st.subheader("👩‍🚀 Our Crew")
+
+cols = st.columns(5)
+
+with cols[0]:
+    st.markdown("🌟 **Hà Trí Kiên**  \n*Team Leader* 🇻🇳")
+with cols[1]:
+    st.markdown("🪐 **Vũ Hoà Vượng**  \n*Member* 🇻🇳")
+with cols[2]:
+    st.markdown("🌕 **Dương Hoàng Kỳ Anh**  \n*Member* 🇻🇳")
+with cols[3]:
+    st.markdown("🌌 **Phùng Thiện Bảo**  \n*Member* 🇻🇳")
+with cols[4]:
+    st.markdown("💫 **Đinh Thảo Nhi**  \n*Member* 🇻🇳")
+
+st.divider()
+
+st.markdown("> ✨ *“Exploring the unknown, one dataset at a time.”*")

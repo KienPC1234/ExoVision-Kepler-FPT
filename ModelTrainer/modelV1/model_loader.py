@@ -11,8 +11,36 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import Input
+from tensorflow.keras.saving import register_keras_serializable
 
 tf.get_logger().setLevel('ERROR')
+
+@register_keras_serializable(package="Custom", name="RecallClass0")
+class RecallClass0(tf.keras.metrics.Metric):
+    def __init__(self, name='recall_class0', **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.true_negatives = self.add_weight(name='tn', initializer='zeros')
+        self.false_positives = self.add_weight(name='fp', initializer='zeros')
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_pred = tf.cast(tf.greater(y_pred, 0.5), tf.float32)
+        y_true = tf.cast(y_true, tf.float32)
+
+        tn = tf.reduce_sum((1 - y_true) * (1 - y_pred))
+        fp = tf.reduce_sum((1 - y_true) * y_pred)
+
+        self.true_negatives.assign_add(tn)
+        self.false_positives.assign_add(fp)
+
+    def result(self):
+        return self.true_negatives / (
+            self.true_negatives + self.false_positives + tf.keras.backend.epsilon()
+        )
+
+    def reset_states(self):
+        self.true_negatives.assign(0.)
+        self.false_positives.assign(0.)
 
 # ------------------------- TFNNClassifier (unpickle-compatible, match training) -------------------------
 class TFNNClassifier(BaseEstimator, ClassifierMixin):
@@ -27,7 +55,8 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
 
     def build_model(self):
         model = tf.keras.Sequential([
-            tf.keras.layers.Dense(64, activation='relu', input_shape=(self.input_dim,)),
+            Input(shape=(self.input_dim,)),
+            tf.keras.layers.Dense(64, activation='relu'),
             tf.keras.layers.Dropout(0.3),
             tf.keras.layers.Dense(32, activation='relu'),
             tf.keras.layers.Dropout(0.3),
@@ -36,7 +65,7 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
         ])
         model.compile(optimizer='adam',
                       loss='binary_crossentropy',
-                      metrics=['accuracy', tf.keras.metrics.Recall(name='recall')])
+                      metrics=['accuracy', RecallClass0()])
         return model
 
     def fit(self, X, y):
@@ -55,7 +84,7 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
 
         # Early stopping
         early_stopping = EarlyStopping(
-            monitor='val_recall',
+            monitor='val_recall_class0',
             patience=5,
             restore_best_weights=True,
             mode='max'
@@ -93,11 +122,13 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
         tf_model_weights = state.pop('_tf_model_weights', None)
         self.__dict__.update(state)
         if tf_model_json is not None:
-            model = tf.keras.models.model_from_json(tf_model_json)
+            # Use custom_objects to handle the custom metric during deserialization
+            custom_objects = {'RecallClass0': RecallClass0}
+            model = tf.keras.models.model_from_json(tf_model_json, custom_objects=custom_objects)
             model.set_weights(tf_model_weights)
             model.compile(optimizer='adam',
                           loss='binary_crossentropy',
-                          metrics=['accuracy', tf.keras.metrics.Recall(name='recall')])
+                          metrics=['accuracy', RecallClass0()])
             self.model = model
         else:
             self.model = None
@@ -134,6 +165,7 @@ class ModelLoader:
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
         try:
+            # Provide custom_objects globally for joblib load if needed, but since TFNN is defined here, it should work
             self.model = joblib.load(model_path)  # No mmap_mode
         except Exception as e:
             raise RuntimeError(f"Failed to load model '{model_path}': {e}")

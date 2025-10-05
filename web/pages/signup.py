@@ -43,20 +43,3 @@ def main(authorizer: AuthHub):
             st.rerun()
         else:
             st.error("❌ Username already existed")
-
-    col1, col2, col3 = st.columns([0.15, 0.1, 0.75])
-    with col1:
-        st.markdown(
-            """
-            <div style='line-height: 2.5;'>
-                Already have an account?
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-    with col2:
-        if st.button("Log In", type="primary"):
-            redirect("login")
-    with col3:
-        # Empty column for spacing
-        pass

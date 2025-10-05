@@ -17,20 +17,3 @@ def main(authorizer: AuthHub):
             st.rerun()
         else:
             st.error("❌ Invalid username or password")
-
-    col1, col2, col3 = st.columns([0.15, 0.1, 0.75])
-    with col1:
-        st.markdown(
-            """
-            <div style='line-height: 2.5;'>
-                New to our platform?
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
-    with col2:
-        if st.button("Sign Up", type="primary"):
-            redirect("signup")
-    with col3:
-        # Empty column for spacing
-        pass

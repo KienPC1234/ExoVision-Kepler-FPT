@@ -19,6 +19,13 @@ import matplotlib.pyplot as plt
 
 tf.get_logger().setLevel('ERROR')
 
+# Compatibility for different TF versions
+try:
+    from tensorflow.keras.saving import register_keras_serializable
+except ImportError:
+    from tensorflow.keras.utils import register_keras_serializable
+
+@register_keras_serializable(package="Custom", name="RecallClass0")
 class RecallClass0(tf.keras.metrics.Metric):
     """Custom metric for recall of class 0 (specificity)."""
     def __init__(self, name='recall_class0', **kwargs):
@@ -57,7 +64,7 @@ class EpochLogger(tf.keras.callbacks.Callback):
 
 class TFNNClassifier(BaseEstimator, ClassifierMixin):
     """TensorFlow Neural Network for tabular binary classification (recall_0-focused)."""
-    def __init__(self, input_dim, epochs=50, batch_size=64, threshold=0.8):
+    def __init__(self, input_dim, epochs=50, batch_size=64, threshold=0.85):
         self.input_dim = input_dim
         self.epochs = epochs
         self.batch_size = batch_size
@@ -126,6 +133,28 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
         probs = self.model.predict(X, verbose=0).flatten()
         return np.column_stack([1 - probs, probs])
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        model = state.pop('model', None)
+        if model is not None:
+            state['_tf_model_json'] = model.to_json()
+            state['_tf_model_weights'] = model.get_weights()
+        return state
+
+    def __setstate__(self, state):
+        tf_model_json = state.pop('_tf_model_json', None)
+        tf_model_weights = state.pop('_tf_model_weights', None)
+        self.__dict__.update(state)
+        if tf_model_json is not None:
+            model = tf.keras.models.model_from_json(tf_model_json)
+            model.set_weights(tf_model_weights)
+            model.compile(optimizer='adam',
+                          loss='binary_crossentropy',
+                          metrics=['accuracy', RecallClass0()])
+            self.model = model
+        else:
+            self.model = None
+
 class StackingBuilder:
     """Builder for Stacking Ensemble."""
     def __init__(self, input_dim, X_train, y_train):
@@ -149,17 +178,17 @@ class StackingBuilder:
         tf_nn.fit(self.X_train, self.y_train)
 
         # Tune LGBM with higher weight for class 0
-        lgb_estimator = lgb.LGBMClassifier(learning_rate=0.1, random_state=42, verbose=-1, class_weight={0: 3.0, 1: 1.0})
+        lgb_estimator = lgb.LGBMClassifier(learning_rate=0.1, random_state=42, verbose=-1, class_weight={0: 4.0, 1: 1.0})
         lgb_param_grid = {'n_estimators': [100]}
         lgb_model = self.tune_base_estimator('lgb', lgb_estimator, lgb_param_grid)
 
         # Tune RF with higher weight for class 0
-        rf_estimator = RandomForestClassifier(max_depth=None, criterion='entropy', random_state=42, class_weight={0: 3.0, 1: 1.0})
+        rf_estimator = RandomForestClassifier(max_depth=None, criterion='entropy', random_state=42, class_weight={0: 4.0, 1: 1.0})
         rf_param_grid = {'n_estimators': [100]}
         rf_model = self.tune_base_estimator('rf', rf_estimator, rf_param_grid)
 
         # Tune XGB with lower scale_pos_weight to reduce bias to positive
-        xgb_estimator = xgb.XGBClassifier(learning_rate=0.1, random_state=42, scale_pos_weight=0.3)
+        xgb_estimator = xgb.XGBClassifier(learning_rate=0.1, random_state=42, scale_pos_weight=0.25)
         xgb_param_grid = {'n_estimators': [100]}
         xgb_model = self.tune_base_estimator('xgb', xgb_estimator, xgb_param_grid)
 
@@ -174,7 +203,7 @@ class StackingBuilder:
         estimators = self.build_base_estimators()
         stacking = StackingClassifier(
             estimators=estimators,
-            final_estimator=LogisticRegression(random_state=42, class_weight={0: 2.0, 1: 1.0}),
+            final_estimator=LogisticRegression(random_state=42, class_weight={0: 2.5, 1: 1.0}),
             cv=StratifiedKFold(n_splits=5),
             stack_method='predict_proba'
         )
@@ -221,6 +250,7 @@ def plot_curves(y_test, y_pred_proba):
     plt.close()
 
 def train_v1():
+    os.makedirs('models/v1', exist_ok=True)
     current_epoch = int(time.time())
     print(f"Current Epoch Time: {current_epoch}")
 
@@ -238,7 +268,7 @@ def train_v1():
     X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
 
     # Check feature importance and select non-zero
-    model = lgb.LGBMClassifier(random_state=42, class_weight={0: 2.0, 1: 1.0})
+    model = lgb.LGBMClassifier(random_state=42, class_weight={0: 3.0, 1: 1.0})
     model.fit(X_train_res, y_train_res)
     importance = pd.Series(model.feature_importances_, index=X_train_res.columns).sort_values(ascending=False)
     print("Top 20 feature importances:")
@@ -285,7 +315,7 @@ def train_v1():
 
     print("Feature importances saved to 'models/v1/feature_importances.txt'")
 
-    os.makedirs('models/v1', exist_ok=True)
+    
     joblib.dump(model, 'models/v1/stacking_model.pkl')
     print("v1 trained & saved!")
 

@@ -34,16 +34,21 @@ def initialize_session_state() -> None:
 
 # Define application pages
 
-pages = [
+ALL_PAGES = [
     st.Page("web/pages/home.py", title="Home", icon="🏠"),
     st.Page("web/pages/Exoplanet_Predictor.py", title="Exoplanet Predictor", icon="🌌"),
     st.Page("web/pages/Exoplanet_Flux_Prediction.py", title="Exoplanet Flux Prediction", icon="💫"),
     st.Page("web/pages/history.py", title="History", icon="📊"),
-    # st.Page("web/pages/data.py", title="Data", icon="🌌"),
-    # st.Page("web/pages/media.py", title="Media", icon="🌌"),
     st.Page("web/pages/docs.py", title="Models Docs", icon="📄"),
-    st.Page("web/pages/helps.py", title="Helps", icon="❓"),
+    st.Page("web/pages/helps.py", title="Help", icon="❓"),
     st.Page("web/pages/about.py", title="About", icon="👤"),
+]
+
+GUEST_PAGES = [
+    st.Page("web/pages/home.py", title="Home", icon="🏠"),
+    st.Page("web/pages/helps.py", title="Help", icon="❓"),
+    st.Page("web/pages/login.py", title="Login", icon="🔑"),
+    st.Page("web/pages/signup.py", title="Sign Up", icon="✨"),
 ]
 
 def render_sidebar_header(auth_user: str, authorizer: AuthHub) -> None:
@@ -68,30 +73,30 @@ def render_sidebar_content(page: StreamlitPage) -> None:
         else:
             cards["Home"]()
 
+
 def dashboard(authorizer: AuthHub) -> None:
     """Main dashboard rendering function."""
-    
     if "auth_user" not in st.session_state:
         return
-    
     initialize_session_state()
-
-    page = st.navigation(pages)
+    page = st.navigation(ALL_PAGES)
     page.run()
-    
     render_sidebar_header(st.session_state["auth_user"], authorizer)
-
     render_sidebar_content(page)
+
 
 def main() -> None:
     """Application entry point with authentication."""
     authorizer = AuthHub(connect_db())
-    
     if authorizer.try_authorize_by_cookie():
         dashboard(authorizer)
     else:
-        from web.pages import login, signup
-        (signup if st.query_params.get("page") == "signup" else login).main(authorizer)
+        page = st.navigation(GUEST_PAGES)
+        if page.title in ["Login", "Sign Up"]:
+            from web.pages import login, signup
+            (signup if page.title == "Sign Up" else login).main(authorizer)
+        else:
+            page.run()
 
 if __name__ == "__main__":
     main()
