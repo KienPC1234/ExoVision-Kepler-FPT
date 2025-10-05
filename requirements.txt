@@ -10,7 +10,6 @@ itsdangerous
 streamlit
 extra-streamlit-components
 sqlalchemy
-websockets
 asyncpg
 psycopg2
 tsai[extras]
@@ -18,3 +17,10 @@ passlib
 argon2_cffi
 ipykernel
 astropy
+streamlit-cookies-manager
+xgboost
+scikit-learn
+imblearn
+lightgbm
+tqdm
+dotenv

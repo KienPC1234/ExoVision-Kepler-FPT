@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
-from sklearn.metrics import classification_report, confusion_matrix, recall_score, PrecisionRecallDisplay, RocCurveDisplay
+from sklearn.metrics import classification_report, confusion_matrix, recall_score, PrecisionRecallDisplay, RocCurveDisplay, make_scorer
 from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.ensemble import StackingClassifier
@@ -12,14 +12,37 @@ import xgboost as xgb
 from sklearn.utils import class_weight
 from imblearn.over_sampling import SMOTE
 import tensorflow as tf
-from tensorflow.keras.callbacks import TensorBoard #type:ignore
+from tensorflow.keras.layers import Input #type:ignore
 import joblib
 import time
 import matplotlib.pyplot as plt
-from datetime import datetime
-
 
 tf.get_logger().setLevel('ERROR')
+
+class RecallClass0(tf.keras.metrics.Metric):
+    """Custom metric for recall of class 0 (specificity)."""
+    def __init__(self, name='recall_class0', **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.true_negatives = self.add_weight(name='tn', initializer='zeros')
+        self.false_positives = self.add_weight(name='fp', initializer='zeros')
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_pred = tf.cast(tf.greater(y_pred, 0.5), tf.float32)
+        y_true = tf.cast(y_true, tf.float32)
+        
+        # Class 0: TN = (1 - y_true) * (1 - y_pred), FP = (1 - y_true) * y_pred
+        tn = tf.reduce_sum((1 - y_true) * (1 - y_pred))
+        fp = tf.reduce_sum((1 - y_true) * y_pred)
+        
+        self.true_negatives.assign_add(tn)
+        self.false_positives.assign_add(fp)
+
+    def result(self):
+        return self.true_negatives / (self.true_negatives + self.false_positives + tf.keras.backend.epsilon())
+
+    def reset_states(self):
+        self.true_negatives.assign(0.)
+        self.false_positives.assign(0.)
 
 class EpochLogger(tf.keras.callbacks.Callback):
     """Custom callback to log metrics for each epoch."""
@@ -27,14 +50,14 @@ class EpochLogger(tf.keras.callbacks.Callback):
         print(f"Epoch {epoch + 1}: "
               f"loss: {logs['loss']:.4f}, "
               f"accuracy: {logs['accuracy']:.4f}, "
-              f"recall: {logs['recall']:.4f}, "
+              f"recall_0: {logs.get('recall_class0', 0):.4f}, "
               f"val_loss: {logs['val_loss']:.4f}, "
               f"val_accuracy: {logs['val_accuracy']:.4f}, "
-              f"val_recall: {logs['val_recall']:.4f}")
+              f"val_recall_0: {logs.get('val_recall_class0', 0):.4f}")
 
 class TFNNClassifier(BaseEstimator, ClassifierMixin):
-    """TensorFlow Neural Network for tabular binary classification (recall-focused)."""
-    def __init__(self, input_dim, epochs=50, batch_size=64, threshold=0.7):
+    """TensorFlow Neural Network for tabular binary classification (recall_0-focused)."""
+    def __init__(self, input_dim, epochs=50, batch_size=64, threshold=0.8):
         self.input_dim = input_dim
         self.epochs = epochs
         self.batch_size = batch_size
@@ -44,7 +67,8 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
 
     def build_model(self):
         model = tf.keras.Sequential([
-            tf.keras.layers.Dense(64, activation='relu', input_shape=(self.input_dim,)),
+            Input(shape=(self.input_dim,)),
+            tf.keras.layers.Dense(64, activation='relu'),
             tf.keras.layers.Dropout(0.3),
             tf.keras.layers.Dense(32, activation='relu'),
             tf.keras.layers.Dropout(0.3),
@@ -53,7 +77,7 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
         ])
         model.compile(optimizer='adam',
                       loss='binary_crossentropy',
-                      metrics=['accuracy', tf.keras.metrics.Recall(name='recall')])  # Explicitly name the recall metric
+                      metrics=['accuracy', RecallClass0()])
         return model
 
     def fit(self, X, y):
@@ -69,10 +93,12 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
         classes = np.unique(y_train)
         weights = class_weight.compute_class_weight(class_weight="balanced", classes=classes, y=y_train)
         class_weight_dict = dict(zip(classes, weights))
+        # Boost weight for class 0 to focus more
+        class_weight_dict[0] *= 2.0
 
-        # Early stopping
+        # Early stopping focused on recall_0
         early_stopping = tf.keras.callbacks.EarlyStopping(
-            monitor='val_recall',
+            monitor='val_recall_class0',
             patience=10,
             restore_best_weights=True,
             mode='max'
@@ -100,29 +126,6 @@ class TFNNClassifier(BaseEstimator, ClassifierMixin):
         probs = self.model.predict(X, verbose=0).flatten()
         return np.column_stack([1 - probs, probs])
 
-    # Thêm để hỗ trợ pickling TF model
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        model = state.pop('model', None)
-        if model is not None:
-            state['_tf_model_json'] = model.to_json()
-            state['_tf_model_weights'] = model.get_weights()
-        return state
-
-    def __setstate__(self, state):
-        tf_model_json = state.pop('_tf_model_json', None)
-        tf_model_weights = state.pop('_tf_model_weights', None)
-        self.__dict__.update(state)
-        if tf_model_json is not None:
-            model = tf.keras.models.model_from_json(tf_model_json)
-            model.set_weights(tf_model_weights)
-            model.compile(optimizer='adam',
-                          loss='binary_crossentropy',
-                          metrics=['accuracy', tf.keras.metrics.Recall(name='recall')])
-            self.model = model
-        else:
-            self.model = None
-
 class StackingBuilder:
     """Builder for Stacking Ensemble."""
     def __init__(self, input_dim, X_train, y_train):
@@ -134,7 +137,8 @@ class StackingBuilder:
         self.feature_importances = {}
 
     def tune_base_estimator(self, name, estimator, param_grid):
-        grid = GridSearchCV(estimator, param_grid, cv=StratifiedKFold(n_splits=5), scoring='recall', n_jobs=1)
+        scorer = make_scorer(recall_score, pos_label=0)
+        grid = GridSearchCV(estimator, param_grid, cv=StratifiedKFold(n_splits=3), scoring=scorer, n_jobs=1)
         grid.fit(self.X_train, self.y_train)
         print(f"Best params for {name}: {grid.best_params_}")
         return grid.best_estimator_
@@ -144,19 +148,19 @@ class StackingBuilder:
         tf_nn = TFNNClassifier(self.input_dim)
         tf_nn.fit(self.X_train, self.y_train)
 
-        # Tune LGBM
-        lgb_estimator = lgb.LGBMClassifier(learning_rate=0.1, random_state=42, verbose=-1, class_weight='balanced')
-        lgb_param_grid = {'n_estimators': [100, 200]}
+        # Tune LGBM with higher weight for class 0
+        lgb_estimator = lgb.LGBMClassifier(learning_rate=0.1, random_state=42, verbose=-1, class_weight={0: 3.0, 1: 1.0})
+        lgb_param_grid = {'n_estimators': [100]}
         lgb_model = self.tune_base_estimator('lgb', lgb_estimator, lgb_param_grid)
 
-        # Tune RF
-        rf_estimator = RandomForestClassifier(max_depth=None, criterion='entropy', random_state=42, class_weight='balanced')
-        rf_param_grid = {'n_estimators': [100, 200]}
+        # Tune RF with higher weight for class 0
+        rf_estimator = RandomForestClassifier(max_depth=None, criterion='entropy', random_state=42, class_weight={0: 3.0, 1: 1.0})
+        rf_param_grid = {'n_estimators': [100]}
         rf_model = self.tune_base_estimator('rf', rf_estimator, rf_param_grid)
 
-        # Tune XGB - add tuning for consistency
-        xgb_estimator = xgb.XGBClassifier(learning_rate=0.1, random_state=42, scale_pos_weight=2)
-        xgb_param_grid = {'n_estimators': [100, 200]}
+        # Tune XGB with lower scale_pos_weight to reduce bias to positive
+        xgb_estimator = xgb.XGBClassifier(learning_rate=0.1, random_state=42, scale_pos_weight=0.3)
+        xgb_param_grid = {'n_estimators': [100]}
         xgb_model = self.tune_base_estimator('xgb', xgb_estimator, xgb_param_grid)
 
         return [
@@ -170,14 +174,15 @@ class StackingBuilder:
         estimators = self.build_base_estimators()
         stacking = StackingClassifier(
             estimators=estimators,
-            final_estimator=LogisticRegression(random_state=42, class_weight='balanced'),
-            cv=StratifiedKFold(n_splits=10),
+            final_estimator=LogisticRegression(random_state=42, class_weight={0: 2.0, 1: 1.0}),
+            cv=StratifiedKFold(n_splits=5),
             stack_method='predict_proba'
         )
 
         # Tune final estimator
-        param_grid = {'final_estimator__C': [0.1, 1.0]}
-        grid = GridSearchCV(stacking, param_grid, cv=StratifiedKFold(n_splits=5), scoring='recall', n_jobs=1, return_train_score=True)
+        param_grid = {'final_estimator__C': [1.0]}
+        scorer = make_scorer(recall_score, pos_label=0)
+        grid = GridSearchCV(stacking, param_grid, cv=StratifiedKFold(n_splits=3), scoring=scorer, n_jobs=1, return_train_score=True)
         grid.fit(self.X_train, self.y_train)
         self.model = grid.best_estimator_
         self.history = grid.cv_results_['mean_test_score']
@@ -193,11 +198,11 @@ class StackingBuilder:
     def plot_scores(self):
         plt.figure(figsize=(10, 6))
         plt.plot(self.history, marker='o')
-        plt.title('Cross-Validation Recall Scores for Final Estimator')
+        plt.title('Cross-Validation Recall_0 Scores for Final Estimator')
         plt.xlabel('Parameter Combination Index')
-        plt.ylabel('Mean Recall Score')
+        plt.ylabel('Mean Recall_0 Score')
         plt.grid(True)
-        plt.savefig('models/v1/cv_recall_scores.png')
+        plt.savefig('models/v1/cv_recall_0_scores.png')
         plt.close()
 
 def plot_curves(y_test, y_pred_proba):
@@ -233,7 +238,7 @@ def train_v1():
     X_train_res, y_train_res = smote.fit_resample(X_train, y_train)
 
     # Check feature importance and select non-zero
-    model = lgb.LGBMClassifier(random_state=42)
+    model = lgb.LGBMClassifier(random_state=42, class_weight={0: 2.0, 1: 1.0})
     model.fit(X_train_res, y_train_res)
     importance = pd.Series(model.feature_importances_, index=X_train_res.columns).sort_values(ascending=False)
     print("Top 20 feature importances:")
@@ -247,11 +252,11 @@ def train_v1():
     print(f"Input dim after feature selection: {input_dim} (Enough for model!)")
 
     builder = StackingBuilder(input_dim, X_train_res, y_train_res)
-    best_recall = builder.build_stacking_model()
-    print(f"Tuned Recall: {best_recall:.2f}")
+    best_recall_0 = builder.build_stacking_model()
+    print(f"Tuned Recall_0: {best_recall_0:.2f}")
 
     builder.plot_scores()
-    print("Cross-validation scores plot saved as 'models/v1/cv_recall_scores.png'")
+    print("Cross-validation scores plot saved as 'models/v1/cv_recall_0_scores.png'")
 
     model = builder.model
     y_pred = model.predict(X_test)

@@ -4,10 +4,15 @@ import uuid
 from passlib.context import CryptContext
 
 import streamlit as st
+import extra_streamlit_components as stx
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
+from streamlit_cookies_manager import CookieManager
 
-from .cookie import CookieUtil, delete_client_cookie
 from ..db.models import User
+
+cookies = CookieManager()
+if not cookies.ready():
+    st.stop()
 
 
 SECRET_KEY = "a3f9d2e7c1b6f8a0d5e9c4b2a7f1e3d6"  # replace in production
@@ -54,8 +59,8 @@ def validate_password(password: str) -> tuple[bool, str]:
 class AuthHub:
     def __init__(self, db_sess):
         self.signer = TimestampSigner(SECRET_KEY)
-        self.cookie_mgr = CookieUtil()
         self.db_sess = db_sess
+        self.cookie = stx.CookieManager()
 
     def create_token(self, username: str) -> str:
         return self.signer.sign(username.encode()).decode()
@@ -69,18 +74,12 @@ class AuthHub:
 
     def authenticated_session(self, usr: User):
         """Create an authenticated session for the user."""
-        new_token = self.create_token(usr.email)
-        self.cookie_mgr.set(
-            AUTH_TOKEN_COOKIE, 
-            new_token, 
-            key=f"set_auth_{usr.email}"
-        )
-        self.cookie_mgr.set(
-            REVISION_COOKIE, 
-            usr.security_stamp, 
-            key=f"set_stamp_{usr.email}"
-        )
         st.session_state["auth_user"] = usr.email
+        new_token = self.create_token(usr.email)
+        cookies[AUTH_TOKEN_COOKIE] = new_token
+        cookies[REVISION_COOKIE] = usr.security_stamp
+        cookies['defensive_logout'] = 'false'
+        cookies.save()
 
     def lookup(self, username: str, password: str):
         usr = self.db_sess.get_user(username)
@@ -112,18 +111,14 @@ class AuthHub:
 
     def logout(self):
         """Clear the authenticated session."""
-        username = st.session_state.pop("auth_user", None)
+        st.session_state.pop("auth_user", None)
         st.session_state["logged_out"] = True
-        self.cookie_mgr.delete(
-            AUTH_TOKEN_COOKIE, 
-            key=f"del_auth_{username if username else 'anon'}"
-        )
-        self.cookie_mgr.delete(
-            REVISION_COOKIE, 
-            key=f"del_stamp_{username if username else 'anon'}"
-        )
-        delete_client_cookie(AUTH_TOKEN_COOKIE)
-        delete_client_cookie(REVISION_COOKIE)
+        cookies[AUTH_TOKEN_COOKIE] = ""
+        cookies[REVISION_COOKIE] = ""
+        cookies['defensive_logout'] = 'true'
+        cookies.save()
+        time.sleep(0.1)
+        st.rerun()
 
     def try_authorize_by_cookie(self):
         auth_user = st.session_state.get("auth_user")
@@ -133,13 +128,13 @@ class AuthHub:
                 # pop the flag and avoid trusting cookies in this run
                 st.session_state.pop("logged_out", None)
                 token = None
-            else:
-                token = self.cookie_mgr.get(AUTH_TOKEN_COOKIE)
+            elif cookies.get('defensive_logout') == 'false':
+                token = cookies.get(AUTH_TOKEN_COOKIE)
                 if token:
                     verified = self.verify_token(token)
                     if verified \
                         and (usr := self.db_sess.get_user(verified)) \
-                        and usr.security_stamp == self.cookie_mgr.get(REVISION_COOKIE):
+                        and usr.security_stamp == cookies.get(REVISION_COOKIE):
 
                         st.session_state["auth_user"] = verified
                         auth_user = verified

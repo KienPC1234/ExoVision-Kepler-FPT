@@ -32,7 +32,7 @@ def history_card():
 
 def models_docs_card():
     """Display preview of model documentation"""
-    st.page_link("web/pages/chat.py", label="Models Docs", icon="📄")
+    st.page_link("web/pages/docs.py", label="Models Docs", icon="📄")
     st.markdown("""
         ### 📄 Model Documentation
         - Technical details
@@ -42,7 +42,7 @@ def models_docs_card():
 
 def help_card():
     """Display preview of help section"""
-    st.page_link("web/pages/status.py", label="Help", icon="❓")
+    st.page_link("web/pages/helps.py", label="Help", icon="❓")
     st.markdown("""
         ### ❓ Help & Support
         - Usage instructions

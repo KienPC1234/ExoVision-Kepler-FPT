@@ -17,7 +17,7 @@ tf.get_logger().setLevel('ERROR')
 # ------------------------- TFNNClassifier (unpickle-compatible, match training) -------------------------
 class TFNNClassifier(BaseEstimator, ClassifierMixin):
     """TensorFlow Neural Network for tabular binary classification (recall-focused)."""
-    def __init__(self, input_dim, epochs=30, batch_size=64, threshold=0.7):
+    def __init__(self, input_dim, epochs=30, batch_size=64, threshold=0.8):
         self.input_dim = input_dim
         self.epochs = epochs
         self.batch_size = batch_size

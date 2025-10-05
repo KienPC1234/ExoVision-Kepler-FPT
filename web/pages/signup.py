@@ -1,6 +1,6 @@
 import streamlit as st
 from ..utils.authorizer import AuthHub, validate_password
-from ..utils.cookie import redirect
+from ..utils.routing import redirect
 
 
 def main(authorizer: AuthHub):

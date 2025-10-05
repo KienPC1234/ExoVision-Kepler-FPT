@@ -1,6 +1,6 @@
 import streamlit as st
 from ..utils.authorizer import AuthHub
-from ..utils.cookie import redirect
+from ..utils.routing import redirect
 
 
 def main(authorizer: AuthHub):
@@ -18,7 +18,7 @@ def main(authorizer: AuthHub):
         else:
             st.error("❌ Invalid username or password")
 
-    col1, col2, col3 = st.columns([0.12, 0.1, 0.78])
+    col1, col2, col3 = st.columns([0.15, 0.1, 0.75])
     with col1:
         st.markdown(
             """

@@ -8,7 +8,7 @@ from streamlit.navigation.page import StreamlitPage
 
 from web.utils.authorizer import AuthHub
 from web.db import connect_db
-from web.utils.cookie import redirect
+from web.utils.routing import redirect
 
 
 # Configure page settings
@@ -41,9 +41,9 @@ pages = [
     st.Page("web/pages/history.py", title="History", icon="📊"),
     # st.Page("web/pages/data.py", title="Data", icon="🌌"),
     # st.Page("web/pages/media.py", title="Media", icon="🌌"),
-    # st.Page("web/pages/layouts.py", title="Layouts", icon="🌌"),
-    st.Page("web/pages/chat.py", title="Models Docs", icon="📄"),
-    st.Page("web/pages/status.py", title="Helps", icon="❓"),
+    st.Page("web/pages/docs.py", title="Models Docs", icon="📄"),
+    st.Page("web/pages/helps.py", title="Helps", icon="❓"),
+    st.Page("web/pages/about.py", title="About", icon="👤"),
 ]
 
 def render_sidebar_header(auth_user: str, authorizer: AuthHub) -> None:
@@ -51,8 +51,9 @@ def render_sidebar_header(auth_user: str, authorizer: AuthHub) -> None:
     with st.sidebar:
         st.markdown(f"👋 Welcome, **{auth_user}**")
         if st.button("Logout", type="secondary"):
+            st.session_state.pop("data_init", None)
             authorizer.logout()
-            st.session_state.pop("init", None)
+            st.rerun()
         st.divider()
 
 def render_sidebar_content(page: StreamlitPage) -> None:
