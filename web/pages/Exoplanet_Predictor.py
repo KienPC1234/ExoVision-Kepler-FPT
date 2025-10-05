@@ -160,7 +160,7 @@ with tab[0]:
         # --- Embed iframe and pass JSON directly ---
         json_data = {**imputed_data, 'disposition': out['class']}
         scc.embed_iframe(
-            url="http://103.252.0.76:8080/iframe/plant_preview/",
+            url=f"https://iframe.fptoj.com/iframe/plant_preview/",
             json_data=json_data,
             height=600
         )
