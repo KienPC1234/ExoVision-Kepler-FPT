@@ -4,6 +4,7 @@ data/
 dataset/
 kepler/
 .vscode
+userdata/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

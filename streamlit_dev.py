@@ -1,17 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from web.pages.cards import (
-    widgets_card,
-    text_card,
-    dataframe_card,
-    charts_card,
-    media_card,
-    layouts_card,
-    chat_card,
-    status_card,
-)
-
 if "init" not in st.session_state:
     st.session_state.chart_data = pd.DataFrame(
         np.random.randn(20, 3), columns=["a", "b", "c"]
@@ -28,7 +17,7 @@ pages = [
     st.Page("web/pages/Exoplanet_Predictor.py", title="Exoplanet Predictor", icon="🌌"),
     st.Page("web/pages/text.py", title="Text", icon="🌌"),
     st.Page("web/pages/data.py", title="Data", icon="🌌"),
-    st.Page("web/pages/charts.py", title="Charts", icon="🌌"),
+    #st.Page("web/pages/charts.py", title="Charts", icon="🌌"),
     st.Page("web/pages/media.py", title="Media", icon="🌌"),
     st.Page("web/pages/layouts.py", title="Layouts", icon="🌌"),
     st.Page("web/pages/chat.py", title="Models Docs", icon="📄"),

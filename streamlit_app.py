@@ -6,16 +6,6 @@ from typing import Optional
 import streamlit as st
 from streamlit.navigation.page import StreamlitPage
 
-from web.pages.cards import (
-    widgets_card,
-    text_card,
-    dataframe_card,
-    charts_card,
-    media_card,
-    layouts_card,
-    chat_card,
-    status_card,
-)
 from web.utils.authorizer import AuthHub
 from web.db import connect_db
 from web.utils.cookie import redirect
@@ -43,19 +33,20 @@ def initialize_session_state() -> None:
         st.session_state.data_init = True
 
 # Define application pages
+
 pages = [
     st.Page("web/pages/home.py", title="Home", icon="🏠"),
-    st.Page("web/pages/widgets.py", title="Widgets", icon="🎛️"),
-    st.Page("web/pages/text.py", title="Text", icon="📝"),
-    st.Page("web/pages/data.py", title="Data", icon="📊"),
-    st.Page("web/pages/charts.py", title="Charts", icon="📈"),
-    st.Page("web/pages/media.py", title="Media", icon="🖼️"),
-    st.Page("web/pages/layouts.py", title="Layouts", icon="📐"),
-    st.Page("web/pages/chat.py", title="Chat", icon="💬"),
-    st.Page("web/pages/status.py", title="Status", icon="ℹ️"),
+    st.Page("web/pages/Exoplanet_Predictor.py", title="Exoplanet Predictor", icon="🌌"),
+    st.Page("web/pages/Exoplanet_Flux_Prediction.py", title="Exoplanet Flux Prediction", icon="💫"),
+    st.Page("web/pages/history.py", title="History", icon="📊"),
+    # st.Page("web/pages/data.py", title="Data", icon="🌌"),
+    # st.Page("web/pages/media.py", title="Media", icon="🌌"),
+    # st.Page("web/pages/layouts.py", title="Layouts", icon="🌌"),
+    st.Page("web/pages/chat.py", title="Models Docs", icon="📄"),
+    st.Page("web/pages/status.py", title="Helps", icon="❓"),
 ]
 
-def render_sidebar_header(auth_user: str, authorizer: AuthHub, page: StreamlitPage) -> None:
+def render_sidebar_header(auth_user: str, authorizer: AuthHub) -> None:
     """Render the sidebar header with user information and navigation."""
     with st.sidebar:
         st.markdown(f"👋 Welcome, **{auth_user}**")
@@ -66,29 +57,15 @@ def render_sidebar_header(auth_user: str, authorizer: AuthHub, page: StreamlitPa
 
 def render_sidebar_content(page: StreamlitPage) -> None:
     """Render the sidebar content based on current page."""
+    from web.pages.cards import get_all_cards
+    
     with st.sidebar.container(height=310):
-        card_mapping = {
-            "Widgets": widgets_card,
-            "Text": text_card,
-            "Data": dataframe_card,
-            "Charts": charts_card,
-            "Media": media_card,
-            "Layouts": layouts_card,
-            "Chat": chat_card,
-            "Status": status_card
-        }
+        cards = get_all_cards()
         
-        if page.title in card_mapping:
-            card_mapping[page.title]()
+        if page.title in cards:
+            cards[page.title]()
         else:
-            st.page_link("web/pages/home.py", 
-                        label="Home", 
-                        icon="🏠")
-            st.markdown("""
-                ### Welcome! 
-                Select a page from above to explore different features.
-                This sidebar provides quick previews of each section.
-            """)
+            cards["Home"]()
 
 def dashboard(authorizer: AuthHub) -> None:
     """Main dashboard rendering function."""
@@ -101,7 +78,7 @@ def dashboard(authorizer: AuthHub) -> None:
     page = st.navigation(pages)
     page.run()
     
-    render_sidebar_header(st.session_state["auth_user"], authorizer, page)
+    render_sidebar_header(st.session_state["auth_user"], authorizer)
 
     render_sidebar_content(page)
 
@@ -112,8 +89,8 @@ def main() -> None:
     if authorizer.try_authorize_by_cookie():
         dashboard(authorizer)
     else:
-        from web.pages import login
-        login.main(authorizer)
+        from web.pages import login, signup
+        (signup if st.query_params.get("page") == "signup" else login).main(authorizer)
 
 if __name__ == "__main__":
     main()

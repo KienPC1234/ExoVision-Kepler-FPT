@@ -1,10 +1,27 @@
 from sqlalchemy import Boolean, Column, Integer, String, DateTime
-from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.sql import func
 
-
 from ..base import Base
-from ...utils.authorizer import gen_security_stamp, hash_pwd
+
+
+def gen_security_stamp_caller():
+    global gen_security_stamp
+    if gen_security_stamp is gen_security_stamp_caller:
+        from ...utils.authorizer import gen_security_stamp as gss
+        gen_security_stamp = gss
+    return gen_security_stamp()
+
+gen_security_stamp = gen_security_stamp_caller
+
+def hash_pwd_caller():
+    global hash_pwd
+    if hash_pwd is hash_pwd_caller:
+        from ...utils.authorizer import hash_pwd as hp
+        hash_pwd = hp
+    return hash_pwd()
+
+hash_pwd = hash_pwd_caller
 
 
 class User(Base):
@@ -17,8 +34,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_deleted = Column(Boolean, default=False)
-
-    username = email
+    predictions = relationship("PredictRecord", back_populates="user")
 
     @property
     def is_active(self):

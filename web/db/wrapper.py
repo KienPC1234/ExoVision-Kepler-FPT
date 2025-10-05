@@ -1,11 +1,12 @@
-from typing import Optional, Any, List, Collection, TypeVar, Type
+from typing import Optional, Any, List, Collection, TypeVar, Type, Union
+from datetime import datetime, timezone
 
 from sqlalchemy import select, Select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session 
 
 from .base import Base
-from .models import User
+from .models import User, PredictRecord
 
 
 T = TypeVar("T")
@@ -57,9 +58,9 @@ class DBWrapper:
             query = query.filter(*filters)
         result = self.execute(query)
         return result.scalar()
-
-    def query_model_by_id(self, model_t: Type[T], id: Any, id_attr: str = "id") -> Optional[T]:
-        return self.query_model(model_t, (getattr(model_t, id_attr) == id,))
+    
+    def query_model_ex(self, model_t: Type[T], **kwargs) -> Optional[T]:
+        return self.query_model(model_t, (getattr(model_t, key) == val for key, val in kwargs.items()))
 
     def query_models(
         self,
@@ -79,15 +80,15 @@ class DBWrapper:
 
     # User-related methods
     def get_user(self, username: str) -> Optional[User]:
-        return self.query_model_by_id(User, username, id_attr="username")
+        return self.query_model_ex(User, email=username)
 
     def is_username_taken(self, username: str, exclude_user_id: Optional[int] = None) -> bool:
         """
         Check if a username is already taken, excluding a specific user ID.
         """
-        filters = (User.username == username,)
+        filters = (User.email == username,)
         if exclude_user_id:
-            filters = tuple(filters) + (User.id != exclude_user_id,)
+            filters += (User.id != exclude_user_id,)
         return self.query_model(User, filters=filters) is not None
 
     def soft_delete_user(self, user: User) -> None:
@@ -113,6 +114,33 @@ class DBWrapper:
         self.delete(user)
         if self.auto_commit:
             self.commit()
+
+    # History-related methods
+    def add_prediction_record(
+        self,
+        user: Union[User, int],
+        type: str,
+        name: str,
+        result_markdown: str,
+        user_data_path: Optional[str] = None,
+        output_filename: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ) -> PredictRecord:
+        """Create a new prediction record for the user"""
+        user_id = user.id if isinstance(user, User) else user
+        
+        record = PredictRecord(
+            user_id=user_id,
+            type=type,
+            name=name,
+            result_markdown=result_markdown,
+            user_data_path=user_data_path,
+            output_filename=output_filename,
+            timestamp=timestamp or datetime.now(timezone.utc),
+            has_output_file=bool(output_filename)
+        )
+        
+        return self.save_model(record)
 
 
 class AsyncDBWrapper:
@@ -158,8 +186,8 @@ class AsyncDBWrapper:
         result = await self.execute(query)
         return result.scalar()
 
-    async def query_model_by_id(self, model_t: Type[T], id: Any, id_attr: str = "id") -> Optional[T]:
-        return await self.query_model(model_t, (getattr(model_t, id_attr) == id,))
+    async def query_model_ex(self, model_t: Type[T], **kwargs) -> Optional[T]:
+        return await self.query_model(model_t, (getattr(model_t, key) == val for key, val in kwargs.items()))
 
     async def query_models(
         self,
@@ -176,12 +204,12 @@ class AsyncDBWrapper:
 
     # User-related methods
     async def get_user(self, username: str):
-        return await self.query_model_by_id(User, username, id_attr="username")
+        return await self.query_model_ex(User, email=username)
 
     async def is_username_taken(self, username: str, exclude_user_id: Optional[int] = None) -> bool:
-        filters = [User.username == username]
+        filters = User.email == username,
         if exclude_user_id:
-            filters.append(User.id != exclude_user_id)
+            filters += User.id != exclude_user_id,
         return (await self.query_model(User, filters=filters)) is not None
 
     async def soft_delete_user(self, user: User):
@@ -196,3 +224,28 @@ class AsyncDBWrapper:
         self.delete(user)
         if self.auto_commit:
             await self.commit()
+
+    # History-related methods
+    async def add_prediction_record(
+        self,
+        user: Union[User, int],
+        type: str,
+        name: str,
+        result_markdown: str,
+        user_data_path: Optional[str] = None,
+        output_filename: Optional[str] = None,
+        timestamp: Optional[datetime] = None
+    ):
+        new_predict_record = PredictRecord(
+            user_id=user.id if isinstance(user, User) else user,
+            timestamp=timestamp or datetime.now(timezone.utc),
+            type=type,
+            name=name,
+            result_markdown=result_markdown,
+            has_output_file=bool(output_filename),
+            user_data_path=user_data_path,
+            output_filename=output_filename
+        )
+
+        await self.save_model(new_predict_record)
+        return new_predict_record

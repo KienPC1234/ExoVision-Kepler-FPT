@@ -1,13 +1,25 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import sys
 from web.helper import streamlit_custom_components as scc
+from ModelTrainer.modelV1.model_loader import ModelLoader, TFNNClassifier
+from ModelTrainer.modelV1.data_preprocess import *
+from datetime import datetime
+from web.db import connect_db
+from web.db.models.users import User
 
 st.set_page_config(page_title="Exoplanet Predictor", layout="wide")
+sys.modules['__main__'].TFNNClassifier = TFNNClassifier
 
-# ----------------------------
-# TITLE + Markdown hướng dẫn
-# ----------------------------
+@st.cache_resource
+def get_loader():
+    return ModelLoader()
+
+@st.cache_resource
+def get_db():
+    return connect_db()
+
 st.markdown(
     """
 # 🌌 Exoplanet Predictor
@@ -22,14 +34,36 @@ Use the **Simple** tab for a quick planet check or **Advanced** tab for batch pr
 
 with st.expander("ℹ️ How to obtain K2, KOI, or TESS data"):
     st.markdown("""
-- **KOI:** [Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu)  
-- **K2 mission:** [STScI K2 Archive](https://archive.stsci.edu/k2)  
-- **TESS:** [TESS TOI Tables](https://exoplanetarchive.ipac.caltech.edu/docs/tessmission.html)  
+**Data Sources:**  
+| Mission | Link |
+|---------|------|
+| KOI | [Exoplanet Archive](https://exoplanetarchive.ipac.caltech.edu) |
+| K2 | [STScI K2 Archive](https://archive.stsci.edu/k2) |
+| TESS | [TESS TOI Tables](https://exoplanetarchive.ipac.caltech.edu/docs/tessmission.html) |
 
-Required columns: `pl_radj`, `pl_orbper`, `pl_trandur`, `depth`, `st_teff`, `st_logg`, `st_rad`, `koi_kepmag`  
-Optional columns: `koi_impact`, `pl_insol`, `pl_eqt`, `st_dist`
-"""
-    )
+**Required Columns:**  
+`pl_radj`, `pl_orbper`, `pl_trandur`, `depth`, `st_teff`, `st_logg`, `st_rad`, `koi_kepmag`  
+
+**Optional Columns:**  
+`koi_impact`, `pl_insol`, `pl_eqt`, `st_dist`  
+
+**Column Descriptions & Units:**  
+| Column | Description | Unit |
+|--------|------------|------|
+| koi_kepmag | Kepler-band brightness | mag |
+| pl_radj | Planet radius | R_J (Jupiter radii) |
+| koi_impact | Impact parameter | dimensionless |
+| pl_trandur | Transit duration | hours |
+| depth | Transit depth | fraction (normalized from ppm or %) |
+| pl_orbper | Orbital period | days |
+| st_teff | Stellar effective temperature | K |
+| st_logg | Stellar surface gravity | dex (log10(cm/s²)) |
+| st_rad | Stellar radius | R_Sun |
+| pl_insol | Insolation flux | F_Earth |
+| pl_eqt | Planet equilibrium temperature | K |
+| st_dist | Stellar distance | pc |
+""")
+
 
 # ----------------------------
 # Tabs
@@ -40,8 +74,12 @@ tab = st.tabs(["Simple", "Advanced"])
 # TAB 1: Simple
 # ----------------------------
 with tab[0]:
+    # --- Load model ---
+    loader = get_loader()
+    db = get_db()
     st.header("Simple Input - Enter Single Planet Data")
 
+    # --- Field definitions ---
     REQUIRED_FIELDS = [
         ('koi_kepmag', 'Kepler-band brightness (mag)'),
         ('pl_radj', 'Planet radius (R_J)'),
@@ -60,43 +98,72 @@ with tab[0]:
         ('st_dist', 'Stellar distance (pc)')
     ]
 
+    # --- Input form ---
     manual_data = {}
     cols = st.columns(2)
     for i, (field, label) in enumerate(REQUIRED_FIELDS):
         col = cols[i % 2]
-        manual_data[field] = col.number_input(
-            f"{label} *", 
-            value=0.0, 
-            step=0.01, 
-            format="%.5f",
-            help=f"{label} (required)"
-        )
+        manual_data[field] = col.number_input(f"{label} *", value=0.0, step=0.01, format="%.5f")
+
     for i, (field, label) in enumerate(OPTIONAL_FIELDS):
         col = cols[i % 2]
-        manual_data[field] = col.number_input(
-            f"{label}", 
-            value=np.nan, 
-            step=0.01, 
-            format="%.5f",
-            help=f"{label} (optional)"
-        )
+        val = col.text_input(f"{label}", "")
+        try:
+            manual_data[field] = float(val) if val.strip() else np.nan
+        except ValueError:
+            manual_data[field] = np.nan
 
+    # --- Predict button ---
     if st.button("Check Planet"):
-        df_manual = pd.DataFrame([manual_data]).fillna(0)
-        # Derived fields
-        df_manual['density_proxy'] = 1 / df_manual['pl_radj'].replace(0, np.nan)**3
-        df_manual['habitability_proxy'] = df_manual['pl_orbper'] * 0.7 / df_manual['st_teff'].replace(0, np.nan)
-        df_manual['transit_shape_proxy'] = df_manual['depth'] / df_manual['pl_trandur'].replace(0, np.nan)
+        # --- Impute numeric fields ---
+        temp_df = pd.DataFrame([manual_data])
+        numeric_cols = temp_df.select_dtypes(include=[np.number]).columns.tolist()
 
-        # Planet existence check
-        if df_manual['pl_radj'].values[0] > 0 and df_manual['pl_orbper'].values[0] > 0:
-            st.success("✅ This planet exists")
+        if loader.num_imputer is not None and numeric_cols:
+            try:
+                transformed = loader.num_imputer.transform(temp_df[numeric_cols])
+                temp_df[numeric_cols] = pd.DataFrame(transformed, columns=numeric_cols)
+            except Exception:
+                temp_df[numeric_cols] = temp_df[numeric_cols].fillna(temp_df[numeric_cols].median())
         else:
-            st.error("❌ This planet does not exist")
+            temp_df[numeric_cols] = temp_df[numeric_cols].fillna(temp_df[numeric_cols].median())
 
-        st.subheader("Planet Preview")
-        scc.embed_iframe("http://103.252.0.76/iframe/plant_preview/", height=600)
+        # Ensure no NaN left
+        temp_df[numeric_cols] = temp_df[numeric_cols].fillna(temp_df[numeric_cols].median())
+        imputed_data = temp_df.to_dict('records')[0]
 
+        # --- Predict ---
+        X = loader.prepare_input(imputed_data)
+        out = loader.predict(X)
+
+        # --- Display results ---
+        st.subheader("Model Prediction")
+        col1, col2 = st.columns(2)
+        col1.metric("Predicted Class", out['class'], "1 = Confirmed/Candidate")
+        col2.metric("Probability", f"{out['probability']:.4f}")
+
+        # --- Save history to DB ---
+        username = st.session_state.get("auth_user", "anonymous")
+        user: User = db.get_user(username)
+        if user:
+            result_markdown = f"Class: {out['class']}, Probability: {out['probability']:.4f}"
+            db.add_prediction_record(
+                user=user,
+                type="manual_input",
+                name="Single Planet Prediction",
+                result_markdown=result_markdown,
+                user_data_path=None,
+                output_filename=None,
+                timestamp=datetime.now()
+            )
+
+        # --- Embed iframe and pass JSON directly ---
+        json_data = {**imputed_data, 'disposition': out['class']}
+        scc.embed_iframe(
+            url="http://103.252.0.76:8080/iframe/plant_preview/",
+            json_data=json_data,
+            height=600
+        )
 
 # ----------------------------
 # TAB 2: Advanced
@@ -104,24 +171,137 @@ with tab[0]:
 with tab[1]:
     st.header("Advanced Input - Upload CSV (K2 / TESS / KOI)")
     
-    csv_type = st.selectbox("Select Data type", ["k2", "tess", "koi"])
+    csv_type = st.selectbox("Select Data type", ["koi", "k2", "tess"])
     uploaded_file = st.file_uploader("Choose CSV file", type="csv")
     
     if uploaded_file:
-        df_csv = pd.read_csv(uploaded_file).fillna(0)
-
+        df_csv = pd.read_csv(uploaded_file)
+        # Add original index column
+        df_csv['original_index'] = df_csv.index
+        
+        # Do not fillna globally, handle per row and in prepare_input
+        
+        # Apply standardization based on type
+        if csv_type == "koi":
+            df_csv = standardize_koi(df_csv)
+        elif csv_type == "k2":
+            df_csv = standardize_k2(df_csv)
+        elif csv_type == "tess":
+            df_csv = standardize_tess(df_csv)
+        
+        # Drop noise features
+        df_csv = drop_noise_features(df_csv)
+        
+        # Drop disposition if present (for prediction)
+        if 'disposition' in df_csv.columns:
+            df_csv = df_csv.drop('disposition', axis=1)
+        
+        # Define the 12 expected columns
+        expected_cols = [
+            'koi_kepmag', 'pl_radj', 'koi_impact', 'pl_trandur', 'depth',
+            'pl_orbper', 'st_teff', 'st_logg', 'st_rad', 'pl_insol',
+            'pl_eqt', 'st_dist'
+        ]
+        
+        # Add missing expected columns as NaN
+        for col in expected_cols:
+            if col not in df_csv.columns:
+                df_csv[col] = np.nan
+                st.warning(f"Column '{col}' was missing in CSV and added as NaN.")
+        
+        # Reorder to have expected columns first (optional, for clarity)
+        df_csv = df_csv.reindex(columns=expected_cols + [col for col in df_csv.columns if col not in expected_cols], fill_value=np.nan)
+        
+        # Required columns for processing a row
         required_cols = ['pl_radj', 'pl_orbper', 'pl_trandur', 'depth', 'st_teff', 'st_logg', 'st_rad', 'koi_kepmag']
-        missing_cols = [c for c in required_cols if c not in df_csv.columns]
-
-        if missing_cols:
-            st.error(f"Missing required columns: {missing_cols}")
+        
+        # Check if all required columns are now present (after standardization)
+        missing_required = [c for c in required_cols if c not in df_csv.columns]
+        if missing_required:
+            st.error(f"Missing required columns after standardization: {missing_required}. Cannot process.")
         else:
-            df_csv['density_proxy'] = 1 / df_csv['pl_radj'].replace(0, np.nan)**3
-            df_csv['habitability_proxy'] = df_csv['pl_orbper'] * 0.7 / df_csv['st_teff'].replace(0, np.nan)
-            df_csv['transit_shape_proxy'] = df_csv['depth'] / df_csv['pl_trandur'].replace(0, np.nan)
-
+            loader = get_loader()
+            
+            # Initialize prediction columns
+            df_csv['predicted_class'] = np.nan
+            df_csv['probability'] = np.nan
+            df_csv['status'] = 'skipped: missing params'
+            
+            # Process row by row
+            processed_count = 0
+            skipped_count = 0
+            real_count = 0
+            fake_count = 0
+            
+            total_rows = len(df_csv)
+            progress_bar = st.progress(0)
+            
+            for idx, row in df_csv.iterrows():
+                row_dict = row.to_dict()
+                # Remove prediction columns if present
+                row_dict.pop('predicted_class', None)
+                row_dict.pop('probability', None)
+                row_dict.pop('status', None)
+                row_dict.pop('original_index', None)  # Exclude index from input
+                
+                # Check required fields: present and valid (not NaN and >0 where makes sense)
+                missing_params = [col for col in required_cols if pd.isna(row_dict.get(col)) or row_dict.get(col, 0) <= 0]
+                if not missing_params:
+                    try:
+                        X = loader.prepare_input(row_dict)
+                        out = loader.predict(X)
+                        df_csv.at[idx, 'predicted_class'] = out['class']
+                        df_csv.at[idx, 'probability'] = out['probability']
+                        df_csv.at[idx, 'status'] = 'processed'
+                        processed_count += 1
+                        if out['class'] == 1:
+                            real_count += 1
+                        else:
+                            fake_count += 1
+                    except Exception as e:
+                        st.warning(f"Error processing row {idx}: {e}")
+                        skipped_count += 1
+                else:
+                    df_csv.at[idx, 'status'] = f"skipped: missing {', '.join(missing_params)}"
+                    skipped_count += 1
+                
+                # Update progress bar
+                progress_bar.progress((idx + 1) / total_rows)
+            
+            st.info(f"Total rows: {total_rows}")
+            st.info(f"Processed: {processed_count} rows, Skipped: {skipped_count} rows")
+            if processed_count > 0:
+                real_pct = (real_count / processed_count) * 100
+                fake_pct = (fake_count / processed_count) * 100
+                st.metric("Confirmed/Candidate Planets (%)", f"{real_pct:.1f}%")
+                st.metric("False Positives (%)", f"{fake_pct:.1f}%")
+            
             st.subheader("Processed Data Preview")
-            st.dataframe(df_csv.head())
-
+            preview_cols = ['original_index', 'status', 'predicted_class', 'probability'] + expected_cols
+            st.dataframe(df_csv[preview_cols].head())
+            
+            # Save history to file and DB
+            username = st.session_state.get("auth_user", "anonymous")
+            user: User = db.get_user(username)
+            if user:
+                result_markdown = f"Total rows: {total_rows}, Processed: {processed_count}, Skipped: {skipped_count}, Confirmed: {real_count}, False Positives: {fake_count}"
+                import uuid
+                import os
+                from datetime import datetime
+                os.makedirs("userdata", exist_ok=True)
+                filename = str(uuid.uuid4()) + ".csv"
+                full_path = os.path.join("userdata", filename)
+                df_csv.to_csv(full_path, index=False)
+                db.add_prediction_record(
+                    user=user,
+                    type="csv_upload",
+                    name=f"{csv_type.upper()} CSV Predictions ({total_rows} rows)",
+                    result_markdown=result_markdown,
+                    user_data_path="userdata",
+                    output_filename=filename,
+                    timestamp=datetime.now()
+                )
+            
+            # Download updated CSV
             csv_out = df_csv.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Processed CSV", csv_out, "exoplanet_processed.csv", "text/csv")
+            st.download_button("Download Processed CSV with Predictions", csv_out, "exoplanet_predictions.csv", "text/csv")

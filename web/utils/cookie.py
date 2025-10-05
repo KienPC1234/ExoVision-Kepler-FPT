@@ -71,7 +71,7 @@ class CookieUtil:
         except Exception:
             pass
 
-    def get(self, cookie: str):
+    def _get(self, cookie: str):
         """
         Safe get: if the component hasn't populated cookies yet it may have
         'cookies' set to a boolean flag. We try to initialize/populate and
@@ -92,6 +92,16 @@ class CookieUtil:
             pass
 
         return None
+    
+    def get(self, cookie: str):
+        raw = self._get(cookie)
+        if not raw:
+            return None
+        if isinstance(raw, str):
+            return raw
+        if isinstance(raw, dict):
+            return raw.get("value") or raw.get("cookie") or None
+        return getattr(raw, "value", None)
 
     def set(
           self,
@@ -114,8 +124,8 @@ class CookieUtil:
             **kwargs
         )
 
-    def delete(self, cookie: str):
+    def delete(self, cookie: str, key: str = "delete"):
         try:
-            self._delete(cookie)
+            self._delete(cookie, key=key)
         except KeyError:
             pass

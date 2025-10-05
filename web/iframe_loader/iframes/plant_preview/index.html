@@ -125,17 +125,20 @@
     window.changeTheme = function(mode) {
       document.documentElement.classList.toggle('dark', mode === 'dark');
     };
-
-    window.updateJsonData = function(newJson) {
-      const textarea = document.getElementById('jsonInput');
-      if (textarea) {
-        textarea.value = JSON.stringify(newJson, null, 2);
-      }
-      const updateBtn = document.getElementById('btnUpdate');
-      if (updateBtn) {
-        updateBtn.click();
-      }
-    };
   </script>
+  <script>
+window.addEventListener("message", (event) => {
+    // event.origin check optional
+    const data = event.data;
+    console.log("Received JSON:", data);
+
+    // update textarea hoặc gọi hàm updateJsonData
+    const textarea = document.getElementById('jsonInput');
+    if (textarea) textarea.value = JSON.stringify(data, null, 2);
+
+    const btnUpdate = document.getElementById('btnUpdate');
+    if (btnUpdate) btnUpdate.click();
+});
+</script>
 </body>
 </html>
