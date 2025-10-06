@@ -25,18 +25,28 @@ git clone https://github.com/KienPC1234/ExoVision-Kepler-FPT.git
 cd ExoVision-Kepler-FPT
 ```
 
-### 2. Install Requirements
+### 🧪 3. Create and Activate Virtual Environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # For Linux/macOS
+# Or use .venv\Scripts\activate on Windows
+```
+
+> Once activated, your terminal prompt should show `(.venv)` indicating you're inside the virtual environment.
+
+### 4. Install Requirements
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Run Web App
+### 5. Run Web App
 
 ```bash
 streamlit run streamlit_app.py
 ```
-
+---
 ### How It Works
 
 * **Tabular Metadata** → Ensemble Stacking (LightGBM, Random Forest, XGBoost, Neural Network) with Logistic Regression meta-learner.
