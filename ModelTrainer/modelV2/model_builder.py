@@ -70,7 +70,6 @@ CONFIG = {
     },
 
     'save_fname': 'best_patchtst',
-    'export_fname': 'patchtst_learner.pkl',
 }
 
 # ----------------------------------------
