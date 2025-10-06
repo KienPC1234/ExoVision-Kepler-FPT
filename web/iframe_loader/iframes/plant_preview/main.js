@@ -805,18 +805,21 @@ function createHelpPanelInsideContainer() {
   panel.innerHTML = `
     <div id="helpHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <strong style="display:none;">Controls & Hover</strong>
-      <button id="toggleHelp" style="background:rgba(255,255,255,0.12);color:#fff;border:0;padding:4px 8px;border-radius:6px;cursor:pointer;min-width:40px;">Ẩn</button>
+      <button id="toggleHelp" style="background:rgba(255,255,255,0.12);color:#fff;border:0;padding:4px 8px;border-radius:6px;cursor:pointer;min-width:40px;">Hide</button>
     </div>
     <div id="helpBody" style="padding-left:18px;margin:8px 0;display:block;">
       <ul style="padding-left:18px;margin:8px 0;">
-        <li>Chuột trái: quay / kéo</li>
-        <li>Chuột phải + kéo: pan</li>
-        <li>Cuộn: zoom</li>
-        <li>Speed slider: điều chỉnh tốc độ</li>
+        <li>Left click: rotate / drag</li>
+        <li>Right click + drag: pan</li>
+        <li>Scroll: zoom</li>
+        <li>Speed slider: adjust speed</li>
       </ul>
-      <div style="font-size:12px;opacity:0.95">Nếu trỏ vào hành tinh mà không thấy info — có thể mây/atm bắt trước; hover sẽ leo parent chain để tìm info. Thử ẩn panel nếu nó che.</div>
+      <div style="font-size:12px;opacity:0.95">
+        If you hover over a planet and don't see any info — it might be obscured by clouds/atmosphere; hover will climb the parent chain to find info. Try hiding the panel if it's blocking the view.
+      </div>
     </div>
   `;
+
   
   container.style.position = container.style.position || 'relative';
   container.appendChild(panel);

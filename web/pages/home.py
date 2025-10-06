@@ -1,7 +1,6 @@
 import streamlit as st
 
 st.set_page_config(page_title="Exoplanet Discovery Platform", layout="wide")
-
 st.markdown("""
 # 🌌 Exoplanet Discovery Platform
 
@@ -18,6 +17,15 @@ Welcome to the **Exoplanet Discovery Platform**, a cutting-edge web application 
 - Visualize newly discovered exoplanets in **3D**.
 - Understand the planet's size, orbit, and other physical characteristics.
 - Explore planetary systems dynamically to gain insights into habitability and structure.
+
+## 🖼️ 3D Showcase
+""", unsafe_allow_html=True)
+
+# Thêm iframe 3D showcase
+st.components.v1.iframe("https://iframe.fptoj.com/iframe/plant_preview/", height=500)
+
+st.markdown("""
+---
 
 ## 🧠 Researcher-Friendly and Customizable
 - Researchers can **reuse the model architecture** to train on their own datasets.
@@ -38,6 +46,13 @@ This platform bridges the gap between **astronomical data** and **actionable ins
 
 ---
 
-> “Explore, analyze, and visualize exoplanets like never before. Bring your data and see what new worlds await!”
+### 📂 Source Code
 
+To explore the full implementation of our project, please visit the GitHub repository:
+
+🔗 [ExoVision-Kepler-FPT](https://github.com/KienPC1234/ExoVision-Kepler-FPT)
+
+---
+
+> “Explore, analyze, and visualize exoplanets like never before. Bring your data and see what new worlds await!”
 """, unsafe_allow_html=True)
