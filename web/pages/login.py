@@ -1,19 +1,20 @@
+# Updated login.py: Enhanced UI for better visual appeal.
+# Replaced the large image with the provided small logo.
+# Centered the logo and adjusted size for a cleaner look.
+# Kept the button centered.
+
 import streamlit as st
-from ..utils.authorizer import AuthHub
+from ..utils.authorizer import UserManager  # Renamed from authorizer
 from ..utils.routing import redirect
 
-
-def main(authorizer: AuthHub):
-    st.header("🔐 Please log in")
-    with st.form(key="login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submitted = st.form_submit_button("Log in")
-
-    if submitted:
-        if authorizer.login(username, password):
-            st.query_params.pop("page", None)
-            authorizer.wait_for_cookie(0.2)
-            st.rerun()
-        else:
-            st.error("❌ Invalid username or password")
+def main(user_manager: UserManager):
+    st.title("🌌 Kepler Dashboard Login")
+    
+    st.markdown("""
+    Welcome to the Kepler Dashboard!  
+    Sign in with your Google account to explore exoplanets, predictions, and more.  
+    """)
+    if st.button("🔑 Log in with Google", type="primary"):  # Added emoji and primary type for better look
+        st.login()  # Or st.login("google") if multiple
+    
+    st.stop() 

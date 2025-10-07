@@ -24,3 +24,4 @@ imblearn
 lightgbm
 tqdm
 dotenv
+Authlib

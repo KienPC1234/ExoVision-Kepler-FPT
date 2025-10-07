@@ -1,3 +1,9 @@
+# Updated main.py: Uses st.user for authentication check.
+# Integrates user creation in DB after login.
+# Removed guest pages for signup.
+# Adjusted navigation and sidebar.
+# Added st.session_state["auth_user"] = st.user.email for compatibility with existing code.
+
 import time
 import pandas as pd
 import numpy as np
@@ -6,7 +12,7 @@ from typing import Optional
 import streamlit as st
 from streamlit.navigation.page import StreamlitPage
 
-from web.utils.authorizer import AuthHub
+from web.utils.authorizer import UserManager
 from web.db import connect_db
 from web.utils.routing import redirect
 
@@ -47,18 +53,18 @@ ALL_PAGES = [
 GUEST_PAGES = [
     st.Page("web/pages/home.py", title="Home", icon="🏠"),
     st.Page("web/pages/helps.py", title="Help", icon="❓"),
-    st.Page("web/pages/login.py", title="Login", icon="🔑"),
-    st.Page("web/pages/signup.py", title="Sign Up", icon="✨"),
+    st.Page("web/pages/login.py", title="Login With Google", icon="🔑"),
+    # Removed signup
 ]
 
-def render_sidebar_header(auth_user: str, authorizer: AuthHub) -> None:
+def render_sidebar_header(auth_user: str, user_manager: UserManager) -> None:
     """Render the sidebar header with user information and navigation."""
     with st.sidebar:
-        st.markdown(f"👋 Welcome, **{auth_user}**")
+        st.markdown(f"👋 Welcome, **{auth_user}**")  # Using auth_user from session_state
         if st.button("Logout", type="secondary"):
             st.session_state.pop("data_init", None)
-            authorizer.logout()
-            st.rerun()
+            st.session_state.pop("auth_user", None)
+            user_manager.logout()
         st.divider()
 
 def render_sidebar_content(page: StreamlitPage) -> None:
@@ -74,27 +80,36 @@ def render_sidebar_content(page: StreamlitPage) -> None:
             cards["Home"]()
 
 
-def dashboard(authorizer: AuthHub) -> None:
+def dashboard(user_manager: UserManager) -> None:
     """Main dashboard rendering function."""
     initialize_session_state()
     page = st.navigation(ALL_PAGES)
     page.run()
-    render_sidebar_header(st.session_state["auth_user"], authorizer)
+    render_sidebar_header(st.session_state["auth_user"], user_manager)
     render_sidebar_content(page)
 
 
 def main() -> None:
     """Application entry point with authentication."""
-    authorizer = AuthHub(connect_db())
-    if authorizer.try_authorize_by_cookie():
-        dashboard(authorizer)
-    else:
+    user_manager = UserManager(connect_db())
+    
+    if not st.user.is_logged_in:
         page = st.navigation(GUEST_PAGES)
-        if page.title in ["Login", "Sign Up"]:
-            from web.pages import login, signup
-            (signup if page.title == "Sign Up" else login).main(authorizer)
+        if page.title == "Login With Google":
+            from web.pages import login
+            login.main(user_manager)
         else:
             page.run()
+        st.stop()  # Stop if not logged in
+    
+    # After login, set session_state for compatibility
+    st.session_state["auth_user"] = st.user.email
+    
+    # Get or create user in DB
+    user_manager.get_or_create_user(st.user.email, st.user.name)
+    
+    # Proceed to dashboard
+    dashboard(user_manager)
 
 if __name__ == "__main__":
     main()
