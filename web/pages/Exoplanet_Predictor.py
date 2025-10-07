@@ -146,8 +146,7 @@ with tab[0]:
         col2.metric("Probability", f"{out['probability']:.4f}")
 
         # --- Save history to DB ---
-        username = st.session_state.get("auth_user", "anonymous")
-        user: User = db.get_user(username)
+        user: User = db.get_user(st.user.email)
         if user:
             result_markdown = f"Class: {out['class']}, Probability: {out['probability']:.4f}"
             db.add_prediction_record(
@@ -315,9 +314,7 @@ with tab[1]:
             preview_cols = ['original_index', 'status', 'predicted_class', 'probability'] + expected_cols
             st.dataframe(df_csv[preview_cols].head())
             
-            # Save history to file and DB
-            username = st.session_state.get("auth_user", "anonymous")
-            user: User = db.get_user(username)
+            user: User = db.get_user(st.user.email)
             if user:
                 result_markdown = f"Total rows: {total_rows}, Processed: {processed_count}, Skipped: {skipped_count}, Confirmed: {real_count}, False Positives: {fake_count}"
                 import uuid

@@ -31,7 +31,7 @@ def main():
 
     # DB & user
     db = connect_db()
-    user = db.get_user(st.session_state["auth_user"])
+    user = db.get_user(st.user.email)
     predictions = user.predictions
 
     if not predictions:

@@ -5,6 +5,7 @@ dataset/
 kepler/
 .vscode
 userdata/
+secrets.toml
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

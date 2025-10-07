@@ -57,10 +57,10 @@ GUEST_PAGES = [
     # Removed signup
 ]
 
-def render_sidebar_header(auth_user: str, user_manager: UserManager) -> None:
+def render_sidebar_header(user_manager: UserManager) -> None:
     """Render the sidebar header with user information and navigation."""
     with st.sidebar:
-        st.markdown(f"👋 Welcome, **{auth_user}**")  # Using auth_user from session_state
+        st.markdown(f"👋 Welcome, **{st.user.name}**")  # Using auth_user from session_state
         if st.button("Logout", type="secondary"):
             st.session_state.pop("data_init", None)
             st.session_state.pop("auth_user", None)
@@ -85,7 +85,7 @@ def dashboard(user_manager: UserManager) -> None:
     initialize_session_state()
     page = st.navigation(ALL_PAGES)
     page.run()
-    render_sidebar_header(st.session_state["auth_user"], user_manager)
+    render_sidebar_header(user_manager)
     render_sidebar_content(page)
 
 
@@ -101,9 +101,6 @@ def main() -> None:
         else:
             page.run()
         st.stop()  # Stop if not logged in
-    
-    # After login, set session_state for compatibility
-    st.session_state["auth_user"] = st.user.email
     
     # Get or create user in DB
     user_manager.get_or_create_user(st.user.email, st.user.name)

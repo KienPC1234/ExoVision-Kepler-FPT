@@ -7,7 +7,6 @@ from ModelTrainer.modelV2.model_loader import SingletonModel
 from datetime import datetime
 from web.db import connect_db
 from web.db.models.users import User
-from web.utils.authorizer import AuthHub
 
 # Load the singleton model with caching
 @st.cache_resource
@@ -240,11 +239,8 @@ with tab1:
         if success_count > 0:
             st.success(f"Predicted {success_count} bodies!")
 
-            authorizer = AuthHub(db)
             
-            # Save history to DB
-            username = authorizer.get_user_from_cookie() or "anonymous"
-            user: User = db.get_user(username)
+            user: User = db.get_user(st.user.email)
             if user:
                 real_count = len([p for p in st.session_state.predictions if p['class'] == 1])
                 fake_count = len([p for p in st.session_state.predictions if p['class'] == 0])
