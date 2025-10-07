@@ -37,7 +37,7 @@ def initialize_session_state() -> None:
 ALL_PAGES = [
     st.Page("web/pages/home.py", title="Home", icon="🏠"),
     st.Page("web/pages/Exoplanet_Predictor.py", title="Exoplanet Predictor", icon="🌌"),
-    st.Page("web/pages/Exoplanet_Flux_Prediction.py", title="Exoplanet Flux Prediction", icon="💫"),
+    st.Page("web/pages/Exoplanet_Flux_Prediction.py", title="Exoplanet Flux Predictor", icon="💫"),
     st.Page("web/pages/history.py", title="History", icon="📊"),
     st.Page("web/pages/docs.py", title="Models Docs", icon="📄"),
     st.Page("web/pages/helps.py", title="Help", icon="❓"),
@@ -76,8 +76,6 @@ def render_sidebar_content(page: StreamlitPage) -> None:
 
 def dashboard(authorizer: AuthHub) -> None:
     """Main dashboard rendering function."""
-    if "auth_user" not in st.session_state:
-        return
     initialize_session_state()
     page = st.navigation(ALL_PAGES)
     page.run()

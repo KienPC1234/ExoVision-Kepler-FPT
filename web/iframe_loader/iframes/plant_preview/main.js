@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 if (typeof THREE === 'undefined' || typeof OrbitControls === 'undefined') {
   const capWarning = document.getElementById('capWarning');
   capWarning.style.display = 'block';
-  capWarning.textContent = 'Three.js or OrbitControls chưa được tải đúng.';
+  capWarning.textContent = 'Missing THREE or OrbitControls import.';
   throw new Error('Missing THREE or OrbitControls import');
 }
 
@@ -832,15 +832,15 @@ function createHelpPanelInsideContainer() {
   
   toggleHelp.addEventListener('click', (e) => {
     const btn = e.target;
-    if (btn.textContent === 'Ẩn') {
-      btn.textContent = 'Hiện';
+    if (btn.textContent === 'Hide') {
+      btn.textContent = 'Show';
       helpBody.style.display = 'none';
       title.style.display = 'none';
       panel.style.width = '60px';
       panel.style.opacity = '0.9';
       panel.style.pointerEvents = 'auto'; // Vẫn cho phép click nút
     } else {
-      btn.textContent = 'Ẩn';
+      btn.textContent = 'Hide';
       helpBody.style.display = 'block';
       title.style.display = 'block';
       panel.style.width = dynamicWidth + 'px';

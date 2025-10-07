@@ -24,7 +24,7 @@ def history_card():
     """Display preview of prediction history"""
     st.page_link("web/pages/history.py", label="History", icon="📊")
     st.markdown("""
-        ### � Prediction History
+        ### 📊 Prediction History
         - View past predictions
         - Download results
         - Filter by type and date

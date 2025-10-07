@@ -37,12 +37,13 @@ st.markdown("""
 2. Use the Simple tab for manual input, or Advanced tab for CSV upload.
 3. For CSV, select the data type (KOI/K2/TESS) and upload your file.
 4. Review results, download processed CSV, and view prediction history.
+""")
 
----
+with st.expander("ℹ️ Training Exoplanet Predictor"):
+    st.markdown("""
+## 🚀 Training Guide for Exoplanet Predictor
 
-## 🚀 Training Guide for Model V1
-
-This section explains how to train **Model V1** using the prepared metadata features.
+This section explains how to train **Exoplanet Predictor** using the prepared metadata features.
 
 
 #### 📊 Step 1: Prepare Metadata Features
@@ -121,12 +122,11 @@ ModelTrainer/modelV1/model_loader.py
 
 This file demonstrates how to load the trained model and use it for predictions.
 
-✅ You are now ready to train and test **Model V1** with exoplanet metadata!
+✅ You are now ready to train and test **Exoplanet Predictor** with exoplanet metadata!
+""", unsafe_allow_html=True)
 
----
-""")
-
-st.header("💡 Exoplanet Flux Prediction")
+st.markdown("---")
+st.header("💡 Exoplanet Flux Predictor")
 st.markdown("""
 **Purpose:** Predict the existence of exoplanets from flux (light curve) time series data using deep learning (PatchTST model).
 
@@ -144,14 +144,15 @@ st.markdown("""
 - Optional: `KEPID` (if missing, will use -1)
 
 **How to Use:**
-1. Go to the Exoplanet Flux Prediction page.
+1. Go to the Exoplanet Flux Predictor page.
 2. Use Tab 1 to upload files for multiple bodies, or Tab 2 for a preprocessed table.
 3. Click "Predict All Bodies" or "Predict" to run predictions.
 4. View results, download CSV, and see prediction history.
+""")
 
----
-
-## 🌌 Model V2: Time-Series (Lightcurves) Training
+with st.expander("ℹ️ Training Exoplanet Flux Predictor"):
+    st.markdown("""
+## 🌌 Exoplanet Flux Predictor: Time-Series (Lightcurves) Training
 
 ### 📊 Step 1: Prepare Lightcurve Dataset
 
@@ -160,12 +161,12 @@ Two options:
 1. Run preprocessing:
 
    ```bash
-   python /home/sysadmin/TrainAI/ModelTrainer/modelV2/data_preprocess.py
+   python ModelTrainer/modelV2/data_preprocess.py
    ```
 2. Or prepare a parquet dataset at:
 
    ```
-   /home/sysadmin/TrainAI/data/koi_lightcurves.parquet
+   data/koi_lightcurves.parquet
    ```
 
    Required columns:
@@ -258,7 +259,7 @@ Model checkpoints will be saved automatically.
 
 ### 📥 Step 6: Use the Model
 
-After training, run the preprocessing or load directly with `SingletonModel`:
+After training, run the eval or load directly with `SingletonModel` in `ModelTrainer/modelV2/model_loader.py`:
 
 ```python
 class SingletonModel:
@@ -272,10 +273,9 @@ class SingletonModel:
 ```
 
 This allows quick diagnosis on new lightcurve sequences.
-
----
 """)
 
+st.markdown("---")
 st.header("🛠️ Technical Details")
 st.markdown("""
 - **Exoplanet Predictor** uses a machine learning model (TFNNClassifier) trained on astrophysical parameters from NASA catalogs.

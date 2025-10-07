@@ -72,12 +72,24 @@ def main():
     st.sidebar.markdown("### History Summary")
     st.sidebar.metric("Total Predictions", len(predictions))
 
+    # --- Summarization by type ---
     prediction_types = {}
     for p in predictions:
         prediction_types[p.type] = prediction_types.get(p.type, 0) + 1
 
     st.sidebar.markdown("#### By Type")
-    for ptype, count in prediction_types.items():
-        st.sidebar.text(f"{ptype}: {count}")
+
+    # Convert to a DataFrame for nice tabular display
+    import pandas as pd
+    summary_df = pd.DataFrame(
+        [{"Type": ptype, "Count": count} for ptype, count in prediction_types.items()]
+    ).sort_values(by="Count", ascending=False).reset_index(drop=True)
+
+    # Display as a small table
+    st.sidebar.dataframe(
+        summary_df,
+        use_container_width=True,
+        hide_index=True
+    )
 
 main()

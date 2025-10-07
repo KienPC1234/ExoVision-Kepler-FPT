@@ -7,6 +7,7 @@ from ModelTrainer.modelV2.model_loader import SingletonModel
 from datetime import datetime
 from web.db import connect_db
 from web.db.models.users import User
+from web.utils.authorizer import AuthHub
 
 # Load the singleton model with caching
 @st.cache_resource
@@ -112,7 +113,7 @@ def predict_body(merged_df, kepid):
 # -----------------------------
 # Streamlit page
 # -----------------------------
-st.set_page_config(page_title="Exoplanet Flux Prediction", layout="wide")
+st.set_page_config(page_title="Exoplanet Flux Predictor", layout="wide")
 st.title("Exoplanet Flux Prediction using PatchTST")
 st.markdown("""
 This page allows you to predict exoplanet transit probabilities from flux time series.
@@ -125,6 +126,10 @@ This page allows you to predict exoplanet transit probabilities from flux time s
 - Tab 2: Upload preprocessed file with columns ['kepid','time','flux'] for quick prediction.
 - Output: Simple existence message per body.
 """)
+
+with st.expander("📽️ Click to watch the tutorial", expanded=False):
+    st.write("This video explains how to use the Exoplanet Flux Predictor app step by step.")
+    st.video("https://youtu.be/0_FebaOdt38")
 
 tab1, tab2 = st.tabs(["Upload flux files for multiple bodies", "Upload preprocessed table"])
 
@@ -234,9 +239,11 @@ with tab1:
         
         if success_count > 0:
             st.success(f"Predicted {success_count} bodies!")
+
+            authorizer = AuthHub(db)
             
             # Save history to DB
-            username = st.session_state.get("auth_user", "anonymous")
+            username = authorizer.get_user_from_cookie() or "anonymous"
             user: User = db.get_user(username)
             if user:
                 real_count = len([p for p in st.session_state.predictions if p['class'] == 1])

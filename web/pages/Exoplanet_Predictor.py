@@ -64,6 +64,9 @@ with st.expander("ℹ️ How to obtain K2, KOI, or TESS data"):
 | st_dist | Stellar distance | pc |
 """)
 
+with st.expander("📽️ Click to watch the tutorial", expanded=False):
+    st.write("This video explains how to use the Exoplanet Predictor app step by step.")
+    st.video("https://youtu.be/0TWm4pI2Cqs")
 
 # ----------------------------
 # Tabs
@@ -169,9 +172,28 @@ with tab[0]:
 # TAB 2: Advanced
 # ----------------------------
 with tab[1]:
-    st.header("Advanced Input - Upload CSV (K2 / TESS / KOI)")
+    st.header("Advanced Input - Upload CSV (KOI / K2 / TESS / Standardized)")
+
+    csv_type = st.selectbox(
+        "Select Data type", 
+        [
+            "KOI (Kepler Objects of Interest - Raw CSV format)",
+            "K2 (K2 Mission - Raw CSV format)", 
+            "TESS (Transiting Exoplanet Survey Satellite - Raw CSV format)",
+            "Standardized Data (Pre-processed CSV with exactly 12 columns as per guidelines)"
+        ],
+        format_func=lambda x: x  # Use the full descriptive label for display
+    )
     
-    csv_type = st.selectbox("Select Data type", ["koi", "k2", "tess"])
+    # Map descriptive label back to internal type for processing
+    type_mapping = {
+        "KOI (Kepler Objects of Interest - Raw CSV format)": "koi",
+        "K2 (K2 Mission - Raw CSV format)": "k2", 
+        "TESS (Transiting Exoplanet Survey Satellite - Raw CSV format)": "tess",
+        "Standardized Data (Pre-processed CSV with exactly 12 columns as per guidelines)": "standardized"
+    }
+    internal_type = type_mapping[csv_type]
+    
     uploaded_file = st.file_uploader("Choose CSV file", type="csv")
     
     if uploaded_file:
@@ -182,12 +204,16 @@ with tab[1]:
         # Do not fillna globally, handle per row and in prepare_input
         
         # Apply standardization based on type
-        if csv_type == "koi":
+        if internal_type == "koi":
             df_csv = standardize_koi(df_csv)
-        elif csv_type == "k2":
+        elif internal_type == "k2":
             df_csv = standardize_k2(df_csv)
-        elif csv_type == "tess":
+        elif internal_type == "tess":
             df_csv = standardize_tess(df_csv)
+        elif internal_type == "standardized":
+            # For standardized data, skip standardization but validate the 12 columns
+            st.info("Assuming uploaded CSV is already standardized. Validating columns...")
+            pass  # No standardization needed
         
         # Drop noise features
         df_csv = drop_noise_features(df_csv)
@@ -203,11 +229,20 @@ with tab[1]:
             'pl_eqt', 'st_dist'
         ]
         
-        # Add missing expected columns as NaN
-        for col in expected_cols:
-            if col not in df_csv.columns:
-                df_csv[col] = np.nan
-                st.warning(f"Column '{col}' was missing in CSV and added as NaN.")
+        # For standardized data, check if all 12 columns are present
+        if internal_type == "standardized":
+            missing_expected = [col for col in expected_cols if col not in df_csv.columns]
+            if missing_expected:
+                st.error(f"For Standardized Data, all 12 expected columns must be present. Missing: {missing_expected}. Please ensure your CSV matches the guidelines.")
+                st.stop()  # Halt processing if validation fails
+            else:
+                st.success("Standardized data validation passed! All 12 columns detected.")
+        else:
+            # For raw types, add missing expected columns as NaN
+            for col in expected_cols:
+                if col not in df_csv.columns:
+                    df_csv[col] = np.nan
+                    st.warning(f"Column '{col}' was missing in CSV and added as NaN.")
         
         # Reorder to have expected columns first (optional, for clarity)
         df_csv = df_csv.reindex(columns=expected_cols + [col for col in df_csv.columns if col not in expected_cols], fill_value=np.nan)
@@ -295,7 +330,7 @@ with tab[1]:
                 db.add_prediction_record(
                     user=user,
                     type="csv_upload",
-                    name=f"{csv_type.upper()} CSV Predictions ({total_rows} rows)",
+                    name=f"{internal_type.upper()} CSV Predictions ({total_rows} rows)",
                     result_markdown=result_markdown,
                     user_data_path="userdata",
                     output_filename=filename,

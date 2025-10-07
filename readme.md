@@ -57,6 +57,53 @@ Predictions are logged and displayed in both tabular and 3D orbital views. Users
 
 ---
 
+### Project Structure
+```
+ExoVision/
+├── .streamlit/               # Streamlit configuration files
+│   └── config.toml
+├── LICENSE                   # Project license information
+├── ModelTrainer/             # Core training and model loading logic
+│   ├── checkgpu.py           # GPU availability checker
+│   ├── modelV1/              # Version 1 of the model pipeline
+│   │   ├── data_preprocess.py
+│   │   ├── model_builder.py
+│   │   ├── model_loader.py
+│   ├── modelV2/              # Version 2 of the model pipeline
+│   │   ├── check_dataset.py
+│   │   ├── data_preprocess.py
+│   │   ├── model_builder.py
+│   │   ├── model_loader.py
+│   └── readme.md             # Internal documentation for ModelTrainer
+├── data/                     # Preprocessed and raw data files
+│   ├── koi_lightcurves.parquet
+│   ├── merged_processed.csv
+├── dataset/                  # External datasets used for training and prediction
+│   ├── k2_pandc.csv
+│   ├── koi_cumulative.csv
+│   ├── toi.csv
+├── models/                   # Saved models and evaluation artifacts
+│   ├── v1/                   # Artifacts from model version 1
+│   │   ├── feature_list.pkl, stacking_model.pkl, etc.
+│   ├── v2/                   # Artifacts from model version 2
+│   │   ├── best_patchtst.pth, y_test.npy
+├── readme.md                 # Main project documentation
+├── requirements.txt          # Python dependencies
+├── static/                   # Static assets for Streamlit (fonts, videos, etc.)
+│   ├── *.ttf, *.mp4
+├── streamlit_app.py          # Entry point for the Streamlit web application
+├── supervisor_config/        # Supervisor configuration files for deployment
+│   ├── iframe_loader.conf, streamlit.conf
+├── usgi_service.py           # uWSGI service integration script
+├── web/                      # Backend and frontend logic for web integration
+│   ├── db/                   # Database models and wrappers
+│   ├── helper/               # Custom Streamlit components and helpers
+│   ├── iframe_loader/        # HTML/JS assets for iframe rendering
+│   ├── pages/                # Streamlit page modules (e.g., home, login, prediction)
+│   ├── utils/                # Utility functions (auth, routing, etc.)
+```
+---
+
 ## Benefits
 
 * **High Recall & Accuracy** (~90% for metadata, >85% for lightcurves) → fewer missed candidates.

@@ -4,22 +4,20 @@ import uuid
 from passlib.context import CryptContext
 
 import streamlit as st
-import extra_streamlit_components as stx
 from itsdangerous import TimestampSigner, BadSignature, SignatureExpired
-from streamlit_cookies_manager import CookieManager
+from streamlit_cookies_manager import EncryptedCookieManager
 
-from ..db.models import User
+from web.db.models import User
 
-cookies = CookieManager()
+SECRET_KEY = "a3f9d2e7c1b6f8a0d5e9c4b2a7f1e3d6"
+cookies = EncryptedCookieManager(prefix="kepler_dashboard_", password=SECRET_KEY)
 if not cookies.ready():
     st.stop()
 
-
-SECRET_KEY = "a3f9d2e7c1b6f8a0d5e9c4b2a7f1e3d6"  # replace in production
+  # replace in production
 AUTH_TOKEN_COOKIE = "streamlit_auth_token"
 REVISION_COOKIE = "streamlit_security_stamp"
 TOKEN_MAX_AGE = 60 * 60 * 24 * 7
-
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
@@ -28,7 +26,6 @@ def gen_security_stamp() -> str:
 
 verify_password = pwd_context.verify
 hash_pwd = pwd_context.hash
-
 
 def validate_password(password: str) -> tuple[bool, str]:
     """
@@ -60,7 +57,6 @@ class AuthHub:
     def __init__(self, db_sess):
         self.signer = TimestampSigner(SECRET_KEY)
         self.db_sess = db_sess
-        self.cookie = stx.CookieManager()
 
     def create_token(self, username: str) -> str:
         return self.signer.sign(username.encode()).decode()
@@ -72,6 +68,16 @@ class AuthHub:
         except (BadSignature, SignatureExpired):
             return None
 
+    def get_user_from_cookie(self):
+        token = cookies.get(AUTH_TOKEN_COOKIE)
+        if token:
+            verified = self.verify_token(token)
+            if verified \
+                and (usr := self.db_sess.get_user(verified)) \
+                and usr.security_stamp == cookies.get(REVISION_COOKIE):
+                return verified
+        return None
+
     def authenticated_session(self, usr: User):
         """Create an authenticated session for the user."""
         st.session_state["auth_user"] = usr.email
@@ -80,6 +86,7 @@ class AuthHub:
         cookies[REVISION_COOKIE] = usr.security_stamp
         cookies['defensive_logout'] = 'false'
         cookies.save()
+        time.sleep(0.1)
 
     def lookup(self, username: str, password: str):
         usr = self.db_sess.get_user(username)
@@ -97,17 +104,23 @@ class AuthHub:
         if self.db_sess.is_username_taken(username):
             return False
         
+        valid, _ = validate_password(password)
+        if not valid:
+            return False
+        
         new_usr = User(
             email=username,
-            hashed_password=hash_pwd(password)
+            hashed_password=hash_pwd(password),
+            security_stamp=gen_security_stamp()
         )
         self.db_sess.create_user(new_usr)
 
         # Automatically login
         self.authenticated_session(new_usr)
         return True
-    
-    wait_for_cookie = time.sleep
+
+    def wait_for_cookie(self, delay: float):
+        time.sleep(delay)
 
     def logout(self):
         """Clear the authenticated session."""
@@ -121,23 +134,13 @@ class AuthHub:
         st.rerun()
 
     def try_authorize_by_cookie(self):
-        auth_user = st.session_state.get("auth_user")
+        auth_user = None
 
-        if not auth_user:
-            if st.session_state.get("logged_out"):
-                # pop the flag and avoid trusting cookies in this run
-                st.session_state.pop("logged_out", None)
-                token = None
-            elif cookies.get('defensive_logout') == 'false':
-                token = cookies.get(AUTH_TOKEN_COOKIE)
-                if token:
-                    verified = self.verify_token(token)
-                    if verified \
-                        and (usr := self.db_sess.get_user(verified)) \
-                        and usr.security_stamp == cookies.get(REVISION_COOKIE):
+        if st.session_state.get("logged_out"):
+            # pop the flag and avoid trusting cookies in this run
+            st.session_state.pop("logged_out", None)
+        elif cookies.get('defensive_logout') == 'false':
+            auth_user = self.get_user_from_cookie()
 
-                        st.session_state["auth_user"] = verified
-                        auth_user = verified
-
+        st.session_state["auth_user"] = auth_user
         return auth_user
-

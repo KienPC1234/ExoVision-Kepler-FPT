@@ -32,3 +32,9 @@ with cols[4]:
 st.divider()
 
 st.markdown("> ✨ *“Exploring the unknown, one dataset at a time.”*")
+
+st.divider()
+
+st.markdown("""
+📧 **Contact us:** [admin@fptoj.com](mailto:admin@fptoj.com)
+""")
