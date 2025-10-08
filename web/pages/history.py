@@ -1,95 +1,105 @@
 import os
+import pandas as pd
 import streamlit as st
 from web.db import connect_db
-from web.db.wrapper import DBWrapper
 from web.db.models import PredictRecord
+from web.helper.translator import t
+
 
 def display_prediction(record: PredictRecord):
-    """Display a single prediction record in an expander"""
-    with st.expander(f"{record.type} - {record.name} ({record.timestamp.strftime('%Y-%m-%d %H:%M:%S')})"):
-        st.markdown(record.result_markdown)
-        
+    """Display a single prediction record in an expander, translated"""
+    title = f"{record.type} - {record.name} ({record.timestamp.strftime('%Y-%m-%d %H:%M:%S')})"
+    title_translated = t(title)
+
+    with st.expander(title_translated):
+        content = record.result_markdown
+        content_translated = t(content)
+        st.markdown(content_translated)
+
         if record.has_output_file and record.user_data_path and record.output_filename:
             full_output_path = os.path.join(record.user_data_path, record.output_filename)
-            
+
             try:
                 if os.path.exists(full_output_path):
-                    with open(full_output_path, 'rb') as f:
+                    with open(full_output_path, "rb") as f:
                         st.download_button(
-                            "📥 Download Results",
+                            t("📥 Download Results"),
                             f,
                             file_name=record.output_filename,
-                            mime="application/octet-stream"
+                            mime="application/octet-stream",
                         )
                 else:
-                    st.warning("Output file not found!")
-            except (IOError, OSError) as e:
-                st.error(f"Error accessing output file!")
+                    st.warning(t("⚠️ Output file not found!"))
+            except (IOError, OSError):
+                st.error(t("Error accessing output file!"))
+
 
 def main():
-    st.title("📊 Prediction History")
+    # --- Translated UI titles ---
+    st.title(t("📊 Prediction History"))
 
-    # DB & user
+    # --- DB & user ---
     db = connect_db()
     user = db.get_user(st.user.email)
     predictions = user.predictions
 
     if not predictions:
-        st.info("No predictions found. Try making some predictions first!")
+        st.info(t("No predictions found. Try making some predictions first!"))
         return
 
-    # Sort predictions by timestamp (newest first)
-    sorted_predictions = sorted(predictions, key=lambda x: x.timestamp, reverse=True)
-
     # --- Filters & Sorting ---
-    with st.expander("Filters & Sorting", expanded=True):
+    date_orders = [
+        t("Newest first"),
+        t("Oldest first"),
+    ]
+    with st.expander(t("⚙️ Filters & Sorting"), expanded=True):
         col1, col2 = st.columns([2, 3])
         with col1:
             selected_type = st.selectbox(
-                "Filter by type",
-                options=["All"] + sorted(set(p.type for p in predictions))
+                t("Filter by type"),
+                options=["All"] + sorted(set(p.type for p in predictions)),
             )
         with col2:
             date_order = st.radio(
-                "Sort order",
-                ["Newest first", "Oldest first"],
-                horizontal=True
+                t("Sort order"),
+                date_orders,
+                horizontal=True,
             )
 
-    # Apply filters
+    # --- Apply filters ---
+    sorted_predictions = sorted(predictions, key=lambda x: x.timestamp, reverse=True)
     filtered_predictions = sorted_predictions
+
     if selected_type != "All":
-        filtered_predictions = (p for p in filtered_predictions if p.type == selected_type)
-    if date_order == "Oldest first":
-        filtered_predictions = reversed(list(filtered_predictions))
+        filtered_predictions = [p for p in filtered_predictions if p.type == selected_type]
+
+    if date_order == date_orders[1]:
+        filtered_predictions = list(reversed(filtered_predictions))
 
     # --- Display predictions ---
-    st.markdown("### Predictions")
+    st.markdown(f"### {t('Predictions')}")
     for record in filtered_predictions:
         display_prediction(record)
 
     # --- Sidebar summary ---
-    st.sidebar.markdown("### History Summary")
-    st.sidebar.metric("Total Predictions", len(predictions))
+    st.sidebar.markdown(f"### {t('History Summary')}")
+    st.sidebar.metric(
+        t("Total Predictions"),
+        len(predictions),
+    )
 
     # --- Summarization by type ---
     prediction_types = {}
     for p in predictions:
         prediction_types[p.type] = prediction_types.get(p.type, 0) + 1
 
-    st.sidebar.markdown("#### By Type")
+    st.sidebar.markdown(f"#### {t('By Type')}")
 
-    # Convert to a DataFrame for nice tabular display
-    import pandas as pd
     summary_df = pd.DataFrame(
         [{"Type": ptype, "Count": count} for ptype, count in prediction_types.items()]
     ).sort_values(by="Count", ascending=False).reset_index(drop=True)
 
-    # Display as a small table
-    st.sidebar.dataframe(
-        summary_df,
-        use_container_width=True,
-        hide_index=True
-    )
+    st.sidebar.dataframe(summary_df, use_container_width=True, hide_index=True)
+
 
 main()

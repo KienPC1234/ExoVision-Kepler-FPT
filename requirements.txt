@@ -25,3 +25,4 @@ lightgbm
 tqdm
 dotenv
 Authlib
+deep_translator

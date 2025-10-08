@@ -1,9 +1,13 @@
-from sqlalchemy import Boolean, Column, Integer, String, DateTime
+from sqlalchemy import Boolean, Column, Integer, String, DateTime, JSON
 from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.sql import func
 
 from ..base import Base
 
+
+USER_DEFAULT_CONFIG = {
+    "lang": "en",
+}
 
 def gen_security_stamp_caller():
     global gen_security_stamp
@@ -31,6 +35,7 @@ class User(Base):
     email: Mapped[str] = Column(String, unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = Column(String, nullable=False)
     security_stamp: Mapped[str] = Column(String, nullable=False, default=gen_security_stamp)
+    # preferences: Mapped[dict] = Column(JSON, nullable=False, default=USER_DEFAULT_CONFIG)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     is_deleted = Column(Boolean, default=False)

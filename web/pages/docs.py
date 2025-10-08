@@ -1,14 +1,20 @@
 import streamlit as st
+from web.helper.translator import t
 
-st.title("📄 Model & Feature Documentation")
-st.markdown("""
+
+# Page setup (set_page_config must be called before other Streamlit UI calls)
+st.set_page_config(page_title="ExoVision Docs", page_icon="📄")
+
+st.title(t("📄 Model & Feature Documentation"))
+st.markdown(t("""
 # ExoVision Kepler FPT: Documentation
 
 This page provides documentation for the main features and models available in the ExoVision Kepler FPT application.
-""")
+"""))
 
-st.header("🌌 Exoplanet Predictor")
-st.markdown("""
+# --- Section 1: Exoplanet Predictor ---
+st.header(t("🌌 Exoplanet Predictor"))
+st.markdown(t("""
 **Purpose:** Predict exoplanet characteristics and classification (confirmed/candidate/false positive) using astrophysical parameters.
 
 **Features:**
@@ -37,37 +43,35 @@ st.markdown("""
 2. Use the Simple tab for manual input, or Advanced tab for CSV upload.
 3. For CSV, select the data type (KOI/K2/TESS) and upload your file.
 4. Review results, download processed CSV, and view prediction history.
-""")
+"""))
 
-with st.expander("ℹ️ Training Exoplanet Predictor"):
-    st.markdown("""
+with st.expander(t("ℹ️ Training Exoplanet Predictor")):
+    st.markdown(t("""
 ## 🚀 Training Guide for Exoplanet Predictor
 
 This section explains how to train **Exoplanet Predictor** using the prepared metadata features.
-
 
 #### 📊 Step 1: Prepare Metadata Features
 
 Your dataset should include **15 key features**:
 
-1. `koi_kepmag`: Kepler-band brightness (magnitude) – unit: mag
-2. `pl_radj`: Planet radius – unit: R<sub>J</sub> (Jupiter radius, converted if needed)
-3. `koi_impact`: Impact parameter – dimensionless
-4. `pl_trandur`: Transit duration – unit: hours
-5. `depth`: Transit depth – unit: fraction (normalized from ppm or %)
-6. `pl_orbper`: Orbital period – unit: days
-7. `st_teff`: Stellar effective temperature – unit: K
-8. `st_logg`: Stellar surface gravity – unit: dex (log10(cm/s²))
-9. `st_rad`: Stellar radius – unit: R<sub>☉</sub> (Solar radius)
-10. `pl_insol`: Insolation flux – unit: F<sub>Earth</sub> (Earth flux ratio)
-11. `pl_eqt`: Equilibrium temperature – unit: K
-12. `st_dist`: Stellar distance – unit: parsec (pc)
-13. `density_proxy`: Derived proxy (1 / pl_radj³) – unitless
-14. `habitability_proxy`: Derived proxy (pl_orbper * 0.7 / st_teff) – unitless
-15. `transit_shape_proxy`: Derived proxy (depth / pl_trandur) – fraction/hour
+1. `koi_kepmag`: Kepler-band brightness (magnitude) – unit: mag  
+2. `pl_radj`: Planet radius – unit: R<sub>J</sub>  
+3. `koi_impact`: Impact parameter – dimensionless  
+4. `pl_trandur`: Transit duration – hours  
+5. `depth`: Transit depth – fraction  
+6. `pl_orbper`: Orbital period – days  
+7. `st_teff`: Stellar effective temperature – K  
+8. `st_logg`: Stellar surface gravity – dex  
+9. `st_rad`: Stellar radius – R<sub>☉</sub>  
+10. `pl_insol`: Insolation flux – F<sub>Earth</sub>  
+11. `pl_eqt`: Equilibrium temperature – K  
+12. `st_dist`: Stellar distance – parsec  
+13. `density_proxy`: Derived proxy (1 / pl_radj³)  
+14. `habitability_proxy`: Derived proxy (pl_orbper * 0.7 / st_teff)  
+15. `transit_shape_proxy`: Derived proxy (depth / pl_trandur)
 
 ---
-
 #### 🛠 Step 2: Clone Repository
 
 ```bash
@@ -123,11 +127,11 @@ ModelTrainer/modelV1/model_loader.py
 This file demonstrates how to load the trained model and use it for predictions.
 
 ✅ You are now ready to train and test **Exoplanet Predictor** with exoplanet metadata!
-""", unsafe_allow_html=True)
+"""), unsafe_allow_html=True)
 
 st.markdown("---")
-st.header("💡 Exoplanet Flux Predictor")
-st.markdown("""
+st.header(t("💡 Exoplanet Flux Predictor"))
+st.markdown(t("""
 **Purpose:** Predict the existence of exoplanets from flux (light curve) time series data using deep learning (PatchTST model).
 
 **Features:**
@@ -148,10 +152,10 @@ st.markdown("""
 2. Use Tab 1 to upload files for multiple bodies, or Tab 2 for a preprocessed table.
 3. Click "Predict All Bodies" or "Predict" to run predictions.
 4. View results, download CSV, and see prediction history.
-""")
+"""))
 
-with st.expander("ℹ️ Training Exoplanet Flux Predictor"):
-    st.markdown("""
+with st.expander(t("ℹ️ Training Exoplanet Flux Predictor")):
+    st.markdown(t("""
 ## 🌌 Exoplanet Flux Predictor: Time-Series (Lightcurves) Training
 
 ### 📊 Step 1: Prepare Lightcurve Dataset
@@ -273,12 +277,12 @@ class SingletonModel:
 ```
 
 This allows quick diagnosis on new lightcurve sequences.
-""")
+"""))
 
 st.markdown("---")
-st.header("🛠️ Technical Details")
-st.markdown("""
+st.header(t("🛠️ Technical Details"))
+st.markdown(t("""
 - **Exoplanet Predictor** uses a machine learning model (TFNNClassifier) trained on astrophysical parameters from NASA catalogs.
 - **Flux Prediction** uses a deep learning PatchTST model for time series classification of light curves.
 - All predictions and results are saved to user history for review and download.
-""")
+"""))

@@ -5,14 +5,14 @@ import torch.nn as nn
 from pathlib import Path
 from tsai.all import PatchTST, get_ts_dls, TSClassification, TSNormalize
 sys.path.append(str(Path(__file__).parent))
-from model_builder import ClassifierWrapper, filter_patchtst_params, _ensure_divisible, CONFIG
+from model_builder import ClassifierWrapper, _ensure_divisible, CONFIG
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# Utilities copied from train.py
+# Utilities copied from model_builder.py
 def _normalize(arr):
     a = np.asarray(arr, dtype=np.float32)
     if a.size == 0:
@@ -99,10 +99,9 @@ class SingletonModel:
                 self.n_classes = 2
 
         # Prepare PatchTST params
-        arch_params = dict(self.config.get('model_params', {}))
-        pp = filter_patchtst_params(arch_params)
+        pp = dict(self.config.get('model_params', {}))
         pp['seq_len'] = self.max_seq_len
-        pp['patch_len'] = int(pp.get('patch_len', arch_params.get('patch_len', 16)))
+        pp['patch_len'] = int(pp.get('patch_len', pp.get('patch_len', 16)))
         pp['seq_len'] = _ensure_divisible(pp['seq_len'], pp['patch_len'])
         self.patch_len = pp['patch_len']
 

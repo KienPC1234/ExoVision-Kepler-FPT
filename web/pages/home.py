@@ -1,7 +1,13 @@
 import streamlit as st
+from web.helper.translator import t
 
-st.set_page_config(page_title="Exoplanet Discovery Platform", layout="wide")
-st.markdown("""
+# --- Page config ---
+st.set_page_config(page_title=t("Exoplanet Discovery Platform"), layout="wide")
+
+# --- Header section ---
+st.markdown(
+    t(
+        """
 # 🌌 Exoplanet Discovery Platform
 
 Welcome to the **Exoplanet Discovery Platform**, a cutting-edge web application designed for astronomers and researchers to **explore, analyze, and discover exoplanets** using data from NASA missions such as **TESS, KOI, and K2**.
@@ -19,12 +25,15 @@ Welcome to the **Exoplanet Discovery Platform**, a cutting-edge web application 
 - Explore planetary systems dynamically to gain insights into habitability and structure.
 
 ## 🖼️ 3D Showcase
-""", unsafe_allow_html=True)
+"""))
 
-# Thêm iframe 3D showcase
+# --- 3D Showcase iframe (not translated) ---
 st.components.v1.iframe("https://iframe.fptoj.com/iframe/plant_preview/", height=500)
 
-st.markdown("""
+# --- Researcher & feature section ---
+st.markdown(
+    t(
+        """
 ---
 
 ## 🧠 Researcher-Friendly and Customizable
@@ -55,4 +64,4 @@ To explore the full implementation of our project, please visit the GitHub repos
 ---
 
 > “Explore, analyze, and visualize exoplanets like never before. Bring your data and see what new worlds await!”
-""", unsafe_allow_html=True)
+"""))

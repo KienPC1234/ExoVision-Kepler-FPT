@@ -6,10 +6,10 @@ columns = parquet_file.schema.names
 num_cols = len(columns)
 num_rows = parquet_file.metadata.num_rows
 
-print("=== HEADER (Tên cột) ===")
+print("=== HEADER (Column Name) ===")
 print(columns)
 
-print("\n=== Thống kê ===")
-print("Số cột (tham số):", num_cols)
-print("Số hàng (thiên thể):", num_rows)
-print("Tổng số ô dữ liệu (hàng x cột):", num_rows * num_cols)
+print("\n=== Statistics ===")
+print("Number of columns (parameters):", num_cols)
+print("Number of rows (celestial):", num_rows)
+print("Total number of data cells (rows x columns):", num_rows * num_cols)

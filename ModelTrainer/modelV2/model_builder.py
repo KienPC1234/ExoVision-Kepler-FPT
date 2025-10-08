@@ -5,7 +5,6 @@ This version trains and exports the model, saving test data separately for eval.
 """
 
 import os
-import json
 import logging
 import random
 from pathlib import Path
@@ -21,7 +20,6 @@ import torch.nn as nn
 
 # tsai / fastai
 from tsai.all import get_ts_dls, PatchTST, TSClassification, TSNormalize,  Learner, F1Score, accuracy
-from fastai.learner import Learner
 from fastai.callback.tracker import SaveModelCallback
 
 
@@ -45,7 +43,7 @@ CONFIG = {
 
     # Training
     'batch_size': 256,
-    'num_epochs': 10,           
+    'num_epochs': 50,           
     'lr': 1e-4,
     'weight_decay': 1e-4,
     'test_size': 0.2,
@@ -290,15 +288,10 @@ def prepare_dls_groupsplit(windows, labels, kepids, cfg):
                      bs=cfg['batch_size'], num_workers=cfg['num_workers'])
     return dls, X, y, train_idx, test_idx, y_raw
 
-# ---------------- Filter PatchTST params ----------------
-def filter_patchtst_params(params):
-    allowed = {'seq_len', 'd_model', 'n_layers', 'n_heads', 'd_ff', 'patch_len', 'dropout'}
-    return {k: v for k, v in params.items() if k in allowed}
 
 # ---------------- Train (PatchTST only) ----------------
 def train_model(dls, cfg):
-    arch_params = dict(cfg.get('model_params', {}))
-    pp = filter_patchtst_params(arch_params)
+    pp = dict(cfg.get('model_params', {}))
     pp['seq_len'] = int(cfg['max_seq_len'])
     pp['patch_len'] = int(pp.get('patch_len', cfg['model_params'].get('patch_len', 16)))
     pp['seq_len'] = _ensure_divisible(pp['seq_len'], pp['patch_len'])
@@ -319,15 +312,20 @@ def train_model(dls, cfg):
     metrics = [accuracy, F1Score(average='macro')]
 
     save_cb = SaveModelCallback(monitor='valid_loss', fname=cfg.get('save_fname', 'best_patchtst'))
-    learn.path = Path('models/v2') 
+    
     learn = Learner(dls, model, loss_func=loss_func, metrics=metrics, cbs=[save_cb])
+    learn.path = Path('models')         
+    learn.model_dir = 'v2'   
     learn.to(cfg['device'])
 
-    # Optional: quick sanity print of one batch output shape (uncomment to debug)
-    # xb, yb = next(iter(dls.train))
-    # with torch.no_grad():
-    #     logits = model(xb.to(cfg['device']))
-    # logger.info(f"Sanity logits shape: {tuple(logits.shape)} (should be (B, n_classes))")
+    # Sanity check: one batch forward 
+    xb, yb = next(iter(dls.train)) 
+    with torch.no_grad(): 
+        logits = model(xb.to(cfg['device'])) 
+    logger.info(f"Sanity logits shape: {tuple(logits.shape)} (should be (B, n_classes))") 
+    
+    if logits.dim() != 2 or logits.shape[1] != dls.c: 
+        logger.warning("Logits shape unexpected. Check ClassifierWrapper / model output.")
 
     logger.info("Starting training...")
     learn.fit_one_cycle(cfg['num_epochs'], cfg['lr'], wd=cfg.get('weight_decay', 0.0))
@@ -347,7 +345,7 @@ def main(cfg):
     logger.info(f"CONFIG: seq_len={cfg['max_seq_len']}, step={cfg['window_step']}, downsample={cfg['downsample_factor']}, device={cfg['device']}")
     windows, labels, kepids = load_and_window_data(cfg)
     dls, X, y, train_idx, test_idx, y_raw = prepare_dls_groupsplit(windows, labels, kepids, cfg)
-    
+    os.makedirs("models/v2",exist_ok=True)
     # Save test data for separate evaluation
     X_test = X[test_idx].astype(np.float32)
     y_test = y[test_idx].astype(int)
@@ -356,7 +354,7 @@ def main(cfg):
     logger.info(f"Saved test data: X_test shape {X_test.shape}, y_test shape {y_test.shape}")
     
     learn = train_model(dls, cfg)
-    print("Training completed. Run eval.py for evaluation.")
+    print("Training completed. Run model_loader.py for evaluation.")
 
 if __name__ == "__main__":
     main(CONFIG)

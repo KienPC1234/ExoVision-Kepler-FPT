@@ -1,112 +1,128 @@
-# Updated main.py: Uses st.user for authentication check.
-# Integrates user creation in DB after login.
-# Removed guest pages for signup.
-# Adjusted navigation and sidebar.
-# Added st.session_state["auth_user"] = st.user.email for compatibility with existing code.
-
-import time
-import pandas as pd
-import numpy as np
-from typing import Optional
-
 import streamlit as st
 from streamlit.navigation.page import StreamlitPage
-
 from web.utils.authorizer import UserManager
 from web.db import connect_db
-from web.utils.routing import redirect
+from web.helper.translator import t
+from web.pages.cards import get_all_cards
 
-
-# Configure page settings
+# ✅ Configure page settings
 st.set_page_config(
     page_title="Kepler Dashboard",
     page_icon="🌍",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'About': t("This application helps scientists detect new exoplanet candidates using data from various missions."),
+        'Get help': "mailto:admin@fptoj.com",
+        'Report a bug': "https://github.com/KienPC1234/ExoVision-Kepler-FPT/issues"
+    }
 )
 
-def initialize_session_state() -> None:
-    """Initialize session state with default values if not already present."""
-    if "data_init" not in st.session_state:
-        st.session_state.chart_data = pd.DataFrame(
-            np.random.randn(20, 3), 
-            columns=["a", "b", "c"]
-        )
-        st.session_state.map_data = pd.DataFrame(
-            np.random.randn(1000, 2) / [50, 50] + [37.76, -122.4],
-            columns=["lat", "lon"]
-        )
-        st.session_state.data_init = True
 
-# Define application pages
-
+# ✅ Define application pages
 ALL_PAGES = [
-    st.Page("web/pages/home.py", title="Home", icon="🏠"),
-    st.Page("web/pages/Exoplanet_Predictor.py", title="Exoplanet Predictor", icon="🌌"),
-    st.Page("web/pages/Exoplanet_Flux_Prediction.py", title="Exoplanet Flux Predictor", icon="💫"),
-    st.Page("web/pages/history.py", title="History", icon="📊"),
-    st.Page("web/pages/docs.py", title="Models Docs", icon="📄"),
-    st.Page("web/pages/helps.py", title="Help", icon="❓"),
-    st.Page("web/pages/about.py", title="About", icon="👤"),
+    st.Page("web/pages/home.py", title=t("Home"), icon="🏠"),
+    st.Page("web/pages/Exoplanet_Predictor.py", title=t("Exoplanet Predictor"), icon="🌌"),
+    st.Page("web/pages/Exoplanet_Flux_Prediction.py", title=t("Exoplanet Flux Predictor"), icon="💫"),
+    st.Page("web/pages/history.py", title=t("History"), icon="📊"),
+    st.Page("web/pages/docs.py", title=t("Models Docs"), icon="📄"),
+    st.Page("web/pages/helps.py", title=t("Help"), icon="❓"),
+    st.Page("web/pages/about.py", title=t("About"), icon="👤"),
 ]
 
 GUEST_PAGES = [
-    st.Page("web/pages/home.py", title="Home", icon="🏠"),
-    st.Page("web/pages/helps.py", title="Help", icon="❓"),
-    st.Page("web/pages/login.py", title="Login With Google", icon="🔑"),
-    # Removed signup
+    st.Page("web/pages/home.py", title=t("Home"), icon="🏠"),
+    st.Page("web/pages/helps.py", title=t("Help"), icon="❓"),
+    st.Page("web/pages/login.py", title=t("Login With Google"), icon="🔑"),
 ]
 
-def render_sidebar_header(user_manager: UserManager) -> None:
-    """Render the sidebar header with user information and navigation."""
-    with st.sidebar:
-        st.markdown(f"👋 Welcome, **{st.user.name}**")  # Using auth_user from session_state
-        if st.button("Logout", type="secondary"):
-            st.session_state.pop("data_init", None)
-            st.session_state.pop("auth_user", None)
-            user_manager.logout()
-        st.divider()
 
+# ✅ Sidebar header (translated)
+def render_sidebar_header(user_manager: UserManager) -> None:
+    with st.sidebar:
+        st.markdown(f"👋 {t('Welcome')}, **{st.user.name}**")
+        if st.button(t("Logout"), type="secondary"):
+            user_manager.logout()
+        st.divider()    
+
+
+# ✅ Sidebar content preview cards (translated)
 def render_sidebar_content(page: StreamlitPage) -> None:
-    """Render the sidebar content based on current page."""
-    from web.pages.cards import get_all_cards
-    
-    with st.sidebar.container(height=310):
-        cards = get_all_cards()
+    """Render sidebar content and include a language selector."""
+    with st.sidebar.container(height=350):
+        # Render cards
         
-        if page.title in cards:
-            cards[page.title]()
+        cards = get_all_cards()
+        current_title = page.title
+        if current_title in cards:
+            cards[current_title]()
         else:
             cards["Home"]()
 
 
+# ✅ Dashboard rendering
 def dashboard(user_manager: UserManager) -> None:
-    """Main dashboard rendering function."""
-    initialize_session_state()
     page = st.navigation(ALL_PAGES)
     page.run()
+    st.sidebar.divider()
     render_sidebar_header(user_manager)
     render_sidebar_content(page)
-
-
-def main() -> None:
-    """Application entry point with authentication."""
-    user_manager = UserManager(connect_db())
     
+
+# ✅ Main entry point
+def main() -> None:
+    user_manager = UserManager(connect_db())
+
+    with st.sidebar.container():
+        # Language selector
+        st.markdown("### 🌐 " + t("Language"))
+
+        lang_display = {
+            "en": "🇬🇧 English",
+            "vi": "🇻🇳 Tiếng Việt",
+            "ja": "🇯🇵 日本語",
+            "fr": "🇫🇷 Français",
+            "es": "🇪🇸 Español",
+        }
+
+        # Reverse lookup (so display shows the proper name)
+        current_lang = st.session_state.get("preferences", {}).get("lang", "en")
+        selected_display = lang_display.get(current_lang, "🇬🇧 English")
+
+        selected_lang_display = st.selectbox(
+            label="",
+            options=list(lang_display.values()),
+            index=list(lang_display.values()).index(selected_display),
+            label_visibility="collapsed"
+        )
+
+        # Update language in session_state if changed
+        new_lang = [k for k, v in lang_display.items() if v == selected_lang_display][0]
+        if new_lang != current_lang:
+            if "preferences" not in st.session_state:
+                st.session_state["preferences"] = {}
+            st.session_state["preferences"]["lang"] = new_lang
+            st.rerun()
+
+    # Check login state
     if not st.user.is_logged_in:
         page = st.navigation(GUEST_PAGES)
-        if page.title == "Login With Google":
+        if page.title == t("Login With Google"):
             from web.pages import login
             login.main(user_manager)
         else:
             page.run()
-        st.stop()  # Stop if not logged in
-    
-    # Get or create user in DB
-    user_manager.get_or_create_user(st.user.email, st.user.name)
-    
-    # Proceed to dashboard
+        st.stop()
+
+    # ✅ Get or create user and load preferences
+    usr = user_manager.get_or_create_user(st.user.email, st.user.name)
+
+    if "preferences" not in st.session_state and hasattr(usr, "preferences"):
+        st.session_state["preferences"] = usr.preferencesg
+
+    # Continue to dashboard
     dashboard(user_manager)
+
 
 if __name__ == "__main__":
     main()
