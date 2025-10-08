@@ -139,8 +139,9 @@ This page allows you to predict exoplanet transit probabilities from flux time s
 - Required columns: `TIME` and one of `SAP_FLUX`, `PDCSAP_FLUX`, `FLUX` (case insensitive).  
 - Optional: `KEPID`. If missing, a default value -1 will be assigned. Supports string IDs.
 - Tab 1: Upload files for multiple celestial bodies. Files per body are merged, sorted by time, and processed as one sequence.
-- Tab 2: Upload preprocessed file with columns ['kepid','time','flux'] for quick prediction.
+- Tab 2: Upload preprocessed file with columns `['kepid','time','flux']` for quick prediction.
 - Output: Simple existence message per body.
+
 """
     ),
     unsafe_allow_html=True,

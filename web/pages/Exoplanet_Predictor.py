@@ -17,17 +17,8 @@ from ModelTrainer.modelV1.data_preprocess import (
 )
 from web.db import connect_db
 from web.db.models.users import User
-from web.helper.translator import translate_text  # translation helper
+from web.helper.translator import t  # translation helper
 
-# --- language helper ---
-lang = st.session_state.get("preferences", {}).get("lang", "en")
-def t(text: str) -> str:
-    """Translate text using user's preference (wrapper)."""
-    try:
-        return translate_text(text, lang)
-    except Exception:
-        # Fail gracefully and return original
-        return text
 
 # --- page config (call after lang available) ---
 st.set_page_config(page_title=t("Exoplanet Predictor"), layout="wide")
@@ -48,7 +39,7 @@ st.markdown(
 """
 # 🌌 Exoplanet Predictor
 
-Predict exoplanet characteristics either by **manual input** or by **uploading CSV** from K2, KOI, or TESS catalogs.
+Predict exoplanet characteristics either by **manual input** or by **uploading CSV** from `K2`, `KOI`, or `TESS catalogs`.
 
 Use the **Simple** tab for a quick planet check or **Advanced** tab for batch processing.
 
