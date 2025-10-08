@@ -18,6 +18,8 @@ st.set_page_config(
     }
 )
 
+st.sidebar.image("static/logo.png", use_container_width=True)
+
 
 # ✅ Define application pages
 ALL_PAGES = [
@@ -62,7 +64,7 @@ def render_sidebar_content(page: StreamlitPage) -> None:
 
 # ✅ Dashboard rendering
 def dashboard(user_manager: UserManager) -> None:
-    page = st.navigation(ALL_PAGES)
+    page = st.navigation(ALL_PAGES,position="top")
     page.run()
     st.sidebar.divider()
     render_sidebar_header(user_manager)
@@ -106,7 +108,7 @@ def main() -> None:
 
     # Check login state
     if not st.user.is_logged_in:
-        page = st.navigation(GUEST_PAGES)
+        page = st.navigation(GUEST_PAGES,position="top")
         if page.title == t("Login With Google"):
             from web.pages import login
             login.main(user_manager)
