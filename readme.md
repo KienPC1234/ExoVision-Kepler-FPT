@@ -179,11 +179,11 @@ Below are two short demo videos showcasing **ExoVision’s** data processing and
 ---
 
 ### 🚀 Demo 1 — Exoplanet Predictor
-<video src="static/KeplerFPT.mp4" controls width="600"></video>
+https://github.com/user-attachments/assets/acab2353-c102-47f1-b295-ad62d02aece0
 ---
 
 ### 🔭 Demo 2 — Exoplanet Flux Predictor
-<video src="static/Kepler-FPT 2.mp4" controls width="600"></video>
+https://github.com/user-attachments/assets/fec0db43-fe87-41d1-a9aa-640fc0a7cfa9
 ---
 
 > 🧠 *Kepler-FPT combines deep learning with astrophysical insights to uncover hidden worlds beyond our solar system.*
